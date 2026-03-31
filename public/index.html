@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PanCROcio — Auditoria CRO Gratuita con IA | Boost</title>
+  <meta name="description" content="PanCROcio analiza tu web con inteligencia artificial y te da un informe CRO gratuito en minutos. Mejora tu tasa de conversion con quick wins accionables.">
+  <meta name="keywords" content="CRO, conversion rate optimization, auditoria web, analisis CRO, optimizacion conversion, UX, PanCROcio, Boost">
+  <meta name="author" content="Boost - weareboost.online">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://pancrocio.com">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="PanCROcio — Auditoria CRO Gratuita con IA">
+  <meta property="og:description" content="Analiza tu web gratis con IA. Informe CRO completo con quick wins, wireframes y puntuaciones por categoria en menos de 2 minutos.">
+  <meta property="og:url" content="https://pancrocio.com">
+  <meta property="og:site_name" content="PanCROcio">
+  <meta property="og:image" content="https://pancrocio.com/pancrocio.svg">
+  <meta property="og:locale" content="es_ES">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="PanCROcio — Auditoria CRO Gratuita con IA">
+  <meta name="twitter:description" content="Tu analista CRO con IA. Informe gratuito con quick wins accionables en menos de 2 minutos.">
+  <meta name="twitter:image" content="https://pancrocio.com/pancrocio.svg">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/x-icon" href="/favicon.svg">
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "PanCROcio",
+    "description": "Herramienta de auditoria CRO gratuita impulsada por inteligencia artificial. Analiza tu web y recibe un informe con mejoras accionables.",
+    "url": "https://pancrocio.com",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "EUR"
+    },
+    "creator": {
+      "@type": "Organization",
+      "name": "Boost",
+      "url": "https://www.weareboost.online"
+    }
+  }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f8f9fb;
+      color: #46495C;
+      min-height: 100vh;
+    }
+
+    /* ── Boost Colors ── */
+    /* primary: #EC5F29, secondary: #070F2D, dark: #1C1C2D, body: #46495C */
+    /* cta-gradient: linear-gradient(90deg, #dd974b 0%, #db501a 100%) */
+
+    .hero {
+      background: #070F2D;
+      color: white;
+      padding: 80px 20px 60px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 42px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+    }
+    .hero h1 span { color: #EC5F29; }
+    .hero p { font-size: 18px; opacity: 0.8; max-width: 560px; margin: 0 auto; line-height: 1.6; }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(7,15,45,0.10);
+      max-width: 560px;
+      margin: -30px auto 40px;
+      padding: 32px;
+      position: relative;
+    }
+
+    .form-group { margin-bottom: 20px; }
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #1C1C2D;
+      margin-bottom: 6px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #e2e4ea;
+      border-radius: 10px;
+      font-size: 16px;
+      font-family: inherit;
+      transition: border-color 0.2s;
+      outline: none;
+      color: #1C1C2D;
+    }
+    .form-group input:focus { border-color: #EC5F29; box-shadow: 0 0 0 3px rgba(236,95,41,0.12); }
+    .form-group input::placeholder { color: #9ca3af; }
+
+    .submit-btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(90deg, #dd974b 0%, #db501a 100%);
+      color: white;
+      border: none;
+      border-radius: 100px;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+    }
+    .submit-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(219,80,26,0.35); opacity: 0.95; }
+    .submit-btn:active { transform: translateY(0); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .error-msg {
+      background: #fef2f2;
+      color: #dc2626;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .progress-section {
+      display: none;
+      margin-top: 24px;
+    }
+    .progress-bar {
+      background: #e8e9ee;
+      border-radius: 100px;
+      height: 8px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .progress-bar-fill {
+      background: linear-gradient(90deg, #dd974b, #db501a);
+      height: 100%;
+      width: 0%;
+      border-radius: 100px;
+      transition: width 0.5s;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .progress-messages {
+      font-size: 13px;
+      color: #46495C;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    .progress-messages div {
+      padding: 4px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .motivational-card {
+      display: none;
+      margin-top: 20px;
+      padding: 20px 24px;
+      background: linear-gradient(135deg, #fff7ed, #fef3e2);
+      border-radius: 12px;
+      border: 1px solid #fed7aa;
+      text-align: center;
+      animation: fadeSlide 0.5s ease;
+    }
+    .motivational-icon { font-size: 28px; margin-bottom: 8px; }
+    .motivational-title { font-size: 15px; font-weight: 700; color: #070F2D; margin-bottom: 4px; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .motivational-text { font-size: 13px; color: #46495C; line-height: 1.5; }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .stat-pill {
+      display: none;
+      background: white;
+      border: 1px solid #e2e4ea;
+      border-radius: 100px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: #46495C;
+      animation: fadeSlide 0.3s ease;
+    }
+    .stat-pill strong { color: #070F2D; }
+
+    .elapsed-timer {
+      display: none;
+      margin-top: 12px;
+      font-size: 12px;
+      color: #9ca3af;
+      text-align: center;
+    }
+
+    .report-frame {
+      display: none;
+      width: 100%;
+      margin: 0 auto 40px;
+      overflow: hidden;
+    }
+    .report-frame iframe {
+      width: 100%;
+      border: none;
+      min-height: 800px;
+    }
+
+    .features {
+      max-width: 800px;
+      margin: 0 auto 60px;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+    }
+    .feature {
+      background: white;
+      border-radius: 16px;
+      padding: 28px 24px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(7,15,45,0.06);
+      transition: transform 0.2s;
+    }
+    .feature:hover { transform: translateY(-3px); }
+    .feature-icon {
+      width: 52px;
+      height: 52px;
+      margin: 0 auto 14px;
+      background: linear-gradient(135deg, #fff7ed, #fef3e2);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+    .feature h3 { font-size: 16px; font-weight: 700; color: #070F2D; margin-bottom: 6px; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .feature p { font-size: 13px; color: #46495C; line-height: 1.5; }
+
+    .footer {
+      text-align: center;
+      padding: 24px 20px 40px;
+      font-size: 13px;
+      color: #9ca3af;
+    }
+    .footer a { color: #EC5F29; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <div style="margin-bottom:16px">
+      <img src="/pancrocio.svg" alt="PanCROcio" width="120" height="144" style="filter:drop-shadow(0 4px 12px rgba(0,0,0,0.3))">
+    </div>
+    <h1>Pan<span>CRO</span>cio</h1>
+    <p>Tu analista CRO con IA. Consigue una auditoria CRO gratuita de tu web en minutos. Descubre quick wins para mejorar tu conversion.</p>
+  </div>
+
+  <div class="card">
+    <div class="error-msg" id="error"></div>
+
+    <form id="auditForm">
+      <div class="form-group">
+        <label for="email">Tu Email</label>
+        <input type="email" id="email" placeholder="you@company.com" required>
+      </div>
+      <div class="form-group">
+        <label for="url">URL de tu web</label>
+        <input type="url" id="url" placeholder="https://yoursite.com" required>
+      </div>
+      <button type="submit" class="submit-btn" id="submitBtn">Analizar mi web</button>
+    </form>
+
+    <div class="progress-section" id="progressSection">
+      <div class="progress-bar"><div class="progress-bar-fill" id="progressFill"></div></div>
+
+      <div class="motivational-card" id="motivationalCard">
+        <div class="motivational-icon" id="motivationalIcon"></div>
+        <div class="motivational-title" id="motivationalTitle"></div>
+        <div class="motivational-text" id="motivationalText"></div>
+      </div>
+
+      <div style="display:flex;gap:12px;justify-content:center;margin-top:16px;flex-wrap:wrap" id="statsRow">
+        <div class="stat-pill" id="statAgents"></div>
+        <div class="stat-pill" id="statChecks"></div>
+        <div class="stat-pill" id="statTime"></div>
+      </div>
+
+      <div class="elapsed-timer" id="elapsedTimer"></div>
+
+      <details style="margin-top:12px">
+        <summary style="font-size:12px;color:#9ca3af;cursor:pointer">Technical details</summary>
+        <div class="progress-messages" id="progressMessages"></div>
+      </details>
+    </div>
+  </div>
+
+  <div class="report-frame" id="reportFrame">
+    <iframe id="reportIframe"></iframe>
+  </div>
+
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">&#x1f50d;</div>
+      <h3>Analisis Visual</h3>
+      <p>IA analiza tu layout, CTAs y jerarquia visual</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">&#x1f4dd;</div>
+      <h3>Revision de Copy</h3>
+      <p>Titulares, propuesta de valor y efectividad de CTAs</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">&#x1f4f1;</div>
+      <h3>Check Mobile</h3>
+      <p>Touch targets, diseno responsive y UX movil</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">&#x1f6e1;</div>
+      <h3>Trust Signals</h3>
+      <p>Social proof, garantias y elementos de credibilidad</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    Powered by <a href="https://www.weareboost.online" target="_blank" rel="noopener">Boost</a> &middot; PanCROcio &mdash; Optimizacion de conversion con IA
+  </div>
+
+  <script>
+    const form = document.getElementById('auditForm');
+    const errorEl = document.getElementById('error');
+    const submitBtn = document.getElementById('submitBtn');
+    const progressSection = document.getElementById('progressSection');
+    const progressFill = document.getElementById('progressFill');
+    const progressMessages = document.getElementById('progressMessages');
+    const reportFrame = document.getElementById('reportFrame');
+    const reportIframe = document.getElementById('reportIframe');
+    const motivationalCard = document.getElementById('motivationalCard');
+    const motivationalIcon = document.getElementById('motivationalIcon');
+    const motivationalTitle = document.getElementById('motivationalTitle');
+    const motivationalText = document.getElementById('motivationalText');
+    const elapsedTimer = document.getElementById('elapsedTimer');
+    const statAgents = document.getElementById('statAgents');
+    const statChecks = document.getElementById('statChecks');
+    const statTime = document.getElementById('statTime');
+
+    const MOTIVATIONAL_MESSAGES = [
+      { icon: '&#x1F50D;', title: 'Scanning your website...', text: 'Our AI is loading your site and taking screenshots from desktop and mobile viewpoints.' },
+      { icon: '&#x1F3AF;', title: 'Analyzing visual hierarchy...', text: 'Did you know? Users form an opinion about your site in just 50 milliseconds. First impressions matter!' },
+      { icon: '&#x1F4CA;', title: 'Evaluating conversion elements...', text: 'The average website conversion rate is 2.35%. Top performers achieve 5.31% or higher.' },
+      { icon: '&#x270D;&#xFE0F;', title: 'Reviewing your copy...', text: 'Headlines with numbers get 36% more clicks. Specific CTAs convert 202% better than generic ones.' },
+      { icon: '&#x1F6E1;&#xFE0F;', title: 'Checking trust signals...', text: '88% of consumers trust online reviews as much as personal recommendations. Social proof is powerful.' },
+      { icon: '&#x1F4F1;', title: 'Testing mobile experience...', text: '61% of users won\'t return to a mobile site they had trouble accessing. Mobile UX is critical for conversions.' },
+      { icon: '&#x26A1;', title: 'Measuring performance...', text: 'A 1-second delay in page load time can reduce conversions by 7%. Speed directly impacts your bottom line.' },
+      { icon: '&#x1F9E0;', title: 'AI is synthesizing findings...', text: 'Our agents are cross-referencing patterns from thousands of high-converting websites.' },
+      { icon: '&#x1F3A8;', title: 'Generating improvement wireframes...', text: 'We\'re creating visual mockups showing exactly how your site could look with the suggested changes.' },
+      { icon: '&#x1F680;', title: 'Almost there!', text: 'Companies that A/B test their landing pages see an average 30% lift in conversions. Your report will show you where to start.' },
+      { icon: '&#x1F4A1;', title: 'Fun fact while you wait...', text: 'Changing a button color from green to red increased conversions by 21% for HubSpot. Small changes, big impact!' },
+      { icon: '&#x1F4B0;', title: 'Worth the wait...', text: 'For every $1 invested in UX, companies see a return of $100. That\'s a 9,900% ROI.' },
+      { icon: '&#x1F50E;', title: 'Deep analysis in progress...', text: 'We check over 50 CRO factors including layout, copy, trust elements, mobile UX, and page speed.' },
+      { icon: '&#x2705;', title: 'Prioritizing quick wins...', text: 'We rank improvements by impact vs. effort so you know exactly what to fix first for maximum results.' },
+    ];
+
+    let motivationalIndex = 0;
+    let motivationalInterval = null;
+    let timerInterval = null;
+    let startTime = null;
+
+    function showMotivational() {
+      const msg = MOTIVATIONAL_MESSAGES[motivationalIndex % MOTIVATIONAL_MESSAGES.length];
+      motivationalCard.style.animation = 'none';
+      motivationalCard.offsetHeight;
+      motivationalCard.style.animation = 'fadeSlide 0.5s ease';
+      motivationalIcon.innerHTML = msg.icon;
+      motivationalTitle.textContent = msg.title;
+      motivationalText.textContent = msg.text;
+      motivationalCard.style.display = 'block';
+      motivationalIndex++;
+    }
+
+    function startMotivationalLoop() {
+      motivationalIndex = 0;
+      startTime = Date.now();
+      showMotivational();
+      motivationalInterval = setInterval(showMotivational, 8000);
+
+      statAgents.style.display = 'inline-block';
+      statChecks.style.display = 'inline-block';
+      statTime.style.display = 'inline-block';
+      statAgents.innerHTML = '<strong>6</strong> AI agents';
+      statChecks.innerHTML = '<strong>50+</strong> checks';
+      statTime.innerHTML = '<strong>~2 min</strong> est.';
+
+      elapsedTimer.style.display = 'block';
+      timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const min = Math.floor(elapsed / 60);
+        const sec = elapsed % 60;
+        elapsedTimer.textContent = `Elapsed: ${min}:${sec.toString().padStart(2, '0')}`;
+      }, 1000);
+    }
+
+    function stopMotivationalLoop() {
+      if (motivationalInterval) clearInterval(motivationalInterval);
+      if (timerInterval) clearInterval(timerInterval);
+      motivationalCard.style.display = 'none';
+      elapsedTimer.style.display = 'none';
+    }
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.style.display = 'block';
+      setTimeout(() => { errorEl.style.display = 'none'; }, 5000);
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.style.display = 'none';
+
+      const email = document.getElementById('email').value.trim();
+      const url = document.getElementById('url').value.trim();
+
+      if (!email || !url) return showError('Rellena ambos campos.');
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Iniciando auditoria...';
+
+      try {
+        const res = await fetch('/api/v1/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, url }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          showError(data.error || 'Something went wrong');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Analizar mi web';
+          return;
+        }
+
+        progressSection.style.display = 'block';
+        submitBtn.textContent = 'Analizando...';
+        startMotivationalLoop();
+        pollAudit(data.auditId);
+
+      } catch (err) {
+        showError('Error de conexion. El servidor no responde.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Analizar mi web';
+      }
+    });
+
+    async function pollAudit(auditId) {
+      let progress = 10;
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/v1/audit/${auditId}`);
+          const data = await res.json();
+
+          progressMessages.innerHTML = (data.messages || [])
+            .map(m => `<div>${m}</div>`).join('');
+          progressMessages.scrollTop = progressMessages.scrollHeight;
+
+          if (data.status === 'scraping') progress = 15;
+          else if (data.status === 'analyzing') progress = Math.min(progress + 3, 65);
+          else if (data.status === 'generating_report') progress = 80;
+          else if (data.status === 'completed') progress = 100;
+          else if (data.status === 'failed') {
+            clearInterval(interval);
+            stopMotivationalLoop();
+            showError('La auditoria ha fallado. Intentalo de nuevo.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Analizar mi web';
+            return;
+          }
+          progressFill.style.width = progress + '%';
+
+          const msgs = data.messages || [];
+          const doneAgents = msgs.filter(m => m.includes('\u2713')).length;
+          if (doneAgents > 0) {
+            statAgents.innerHTML = `<strong>${doneAgents}/6</strong> agentes listos`;
+          }
+
+          if (data.status === 'completed') {
+            clearInterval(interval);
+            stopMotivationalLoop();
+            progressFill.style.animation = 'none';
+            progressFill.style.background = '#22c55e';
+
+            motivationalCard.style.display = 'block';
+            motivationalCard.style.background = 'linear-gradient(135deg, #f0fdf4, #ecfdf5)';
+            motivationalCard.style.borderColor = '#86efac';
+            motivationalIcon.innerHTML = '&#x1F389;';
+            motivationalTitle.textContent = 'Tu informe CRO esta listo!';
+            motivationalText.textContent = 'Baja para ver tu informe personalizado de optimizacion de conversion con quick wins accionables.';
+
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            statTime.innerHTML = `<strong>${Math.floor(elapsed / 60)}m ${elapsed % 60}s</strong> total`;
+
+            submitBtn.textContent = 'Informe listo!';
+            submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+
+            setTimeout(() => {
+              reportFrame.style.display = 'block';
+              reportIframe.src = `/api/v1/audit/${auditId}/report`;
+              reportFrame.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+              reportIframe.onload = () => {
+                try {
+                  var resizeIframe = () => {
+                    reportIframe.style.height = reportIframe.contentWindow.document.body.scrollHeight + 40 + 'px';
+                  };
+                  resizeIframe();
+                  // Re-check after images/fonts load and on resize
+                  setTimeout(resizeIframe, 500);
+                  setTimeout(resizeIframe, 1500);
+                  window.addEventListener('resize', resizeIframe);
+                } catch(e) {}
+              };
+            }, 1500);
+          }
+        } catch (err) {}
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
