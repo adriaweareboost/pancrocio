@@ -5,7 +5,7 @@ export function normalizeUrl(url: string): string {
     const trackingParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid', 'ref'];
     trackingParams.forEach((p) => parsed.searchParams.delete(p));
     // Remove trailing slash
-    let normalized = parsed.origin + parsed.pathname.replace(/\/+$/, '') + parsed.search;
+    const normalized = parsed.origin + parsed.pathname.replace(/\/+$/, '') + parsed.search;
     return normalized.toLowerCase();
   } catch {
     return url.toLowerCase().replace(/\/+$/, '');

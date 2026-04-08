@@ -4,12 +4,15 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail } from './services/database.js';
+import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
 import { createGroqProvider } from './services/groq.js';
 import { runPipeline } from './services/pipeline.js';
-import { generateReportHtml } from './services/report-generator.js';
+import { generateReportHtml, DEFAULT_UI_STRINGS } from './services/report-generator.js';
+import { buildVerifyGate, DEFAULT_VERIFY_STRINGS } from './services/verify-gate.js';
+import { parseAcceptLanguage, shouldTranslate, normalizeLangCode, translateReportData, translateUiStrings, translateVerifyStrings } from './agents/translator.js';
+import type { LLMProvider, AgentAnalysis, QuickWin, Mockup, CategoryScores } from './models/interfaces.js';
 import { normalizeUrl, isValidUrl, isValidEmail } from './utils/normalize-url.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -24,6 +27,148 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'croag
 // In-memory audit status tracking (auto-cleanup after 30 min)
 const PROGRESS_TTL_MS = 30 * 60 * 1000;
 const auditProgress = new Map<string, { status: string; messages: string[]; createdAt: number }>();
+
+// In-memory translated report cache (key: `${auditId}|${lang}`, TTL 1h)
+const REPORT_CACHE_TTL_MS = 60 * 60 * 1000;
+const reportCache = new Map<string, { html: string; createdAt: number }>();
+
+// In-memory verify-gate translation cache (key: lang, no TTL — strings rarely change)
+const verifyStringsCache = new Map<string, typeof DEFAULT_VERIFY_STRINGS>();
+
+async function getLocalizedVerifyGate(lang: string, llm: LLMProvider): Promise<string> {
+  const normalized = normalizeLangCode(lang);
+  if (!shouldTranslate(normalized)) return buildVerifyGate(DEFAULT_VERIFY_STRINGS);
+
+  let strings = verifyStringsCache.get(normalized);
+  if (!strings) {
+    try {
+      strings = await translateVerifyStrings(DEFAULT_VERIFY_STRINGS, normalized, llm);
+      verifyStringsCache.set(normalized, strings);
+    } catch (err) {
+      console.error(`[VerifyGate] Translation failed for lang=${normalized}:`, err);
+      strings = DEFAULT_VERIFY_STRINGS;
+    }
+  }
+  return buildVerifyGate(strings);
+}
+
+function getCachedReport(key: string): string | null {
+  const entry = reportCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.createdAt > REPORT_CACHE_TTL_MS) {
+    reportCache.delete(key);
+    return null;
+  }
+  return entry.html;
+}
+
+function setCachedReport(key: string, html: string): void {
+  reportCache.set(key, { html, createdAt: Date.now() });
+}
+
+interface ReportRenderInput {
+  url: string;
+  globalScore: number;
+  scores: CategoryScores;
+  quickWins: QuickWin[];
+  mockups: Mockup[];
+  analyses: AgentAnalysis[];
+  date: string;
+}
+
+/**
+ * Translates a report payload (data + UI labels) to the target language and
+ * returns the rendered HTML. Skips translation if the lang is Spanish.
+ */
+async function translateAndRender(
+  input: ReportRenderInput,
+  lang: string,
+  llm: LLMProvider,
+): Promise<string> {
+  const normalized = normalizeLangCode(lang);
+  if (!shouldTranslate(lang)) {
+    return generateReportHtml({ ...input, lang: normalized });
+  }
+  const [translatedData, translatedUi] = await Promise.all([
+    translateReportData(
+      { quickWins: input.quickWins, mockups: input.mockups, analyses: input.analyses },
+      lang,
+      llm,
+    ),
+    translateUiStrings(DEFAULT_UI_STRINGS, lang, llm),
+  ]);
+  return generateReportHtml({
+    ...input,
+    quickWins: translatedData.quickWins,
+    mockups: translatedData.mockups,
+    analyses: translatedData.analyses,
+    uiStrings: translatedUi,
+    lang: normalized,
+  });
+}
+
+/**
+ * Reconstructs report input from a DB audit row and (optionally) translates
+ * data + UI labels to the target language. Caches the rendered HTML.
+ *
+ * Spanish requests are served from the pre-rendered HTML stored in DB to
+ * avoid the cost of regenerating from data.
+ */
+async function renderLocalizedReport(
+  audit: Record<string, unknown>,
+  lang: string,
+  llm: LLMProvider,
+): Promise<string> {
+  const auditId = audit.id as string;
+  const normalizedLang = normalizeLangCode(lang);
+  const cacheKey = `${auditId}|${normalizedLang}`;
+
+  // Tier 1: in-memory cache (fastest).
+  const memCached = getCachedReport(cacheKey);
+  if (memCached) return memCached;
+
+  // Spanish (or unknown lang) → serve the pre-rendered HTML stored in DB.
+  if (!shouldTranslate(lang)) {
+    const html = audit.report_html as string;
+    if (!html) throw new Error(`Audit ${auditId} has no report_html`);
+    setCachedReport(cacheKey, html);
+    return html;
+  }
+
+  // Tier 2: persistent DB cache (survives server restarts).
+  const dbCached = getStoredTranslation(auditId, normalizedLang);
+  if (dbCached) {
+    setCachedReport(cacheKey, dbCached);
+    return dbCached;
+  }
+
+  // Tier 3: reconstruct typed data and translate. Older audits may lack analyses_json.
+  const input: ReportRenderInput = {
+    url: audit.url as string,
+    globalScore: audit.global_score as number,
+    scores: JSON.parse(audit.scores_json as string) as CategoryScores,
+    quickWins: JSON.parse(audit.quick_wins_json as string) as QuickWin[],
+    mockups: JSON.parse(audit.mockups_json as string) as Mockup[],
+    analyses: audit.analyses_json
+      ? (JSON.parse(audit.analyses_json as string) as AgentAnalysis[])
+      : [],
+    date: ((audit.completed_at as string) || new Date().toISOString()).split('T')[0],
+  };
+
+  const html = await translateAndRender(input, lang, llm);
+  setCachedReport(cacheKey, html);
+  storeTranslation(auditId, normalizedLang, html);
+  saveDatabase(DB_PATH);
+  return html;
+}
+
+/** Periodic cache cleanup — removes expired entries from reportCache. */
+function cleanupReportCache(): void {
+  const now = Date.now();
+  for (const [key, entry] of reportCache) {
+    if (now - entry.createdAt > REPORT_CACHE_TTL_MS) reportCache.delete(key);
+  }
+}
 
 function cleanupProgress(): void {
   const now = Date.now();
@@ -94,6 +239,7 @@ async function main() {
     console.log(`[Verify] Audit ${auditId} — email: ${email} — code: ${verifyCode}`);
 
     cleanupProgress();
+    cleanupReportCache();
     auditProgress.set(auditId, { status: 'pending', messages: ['Audit queued'], createdAt: Date.now() });
 
     res.status(201).json({
@@ -176,7 +322,7 @@ async function main() {
   });
 
   // Get report
-  app.get('/api/v1/audit/:id/report', (req, res) => {
+  app.get('/api/v1/audit/:id/report', async (req, res) => {
     const audit = getAudit(req.params.id);
     if (!audit) {
       return res.status(404).json({ error: 'Audit not found', code: 'NOT_FOUND' });
@@ -185,113 +331,25 @@ async function main() {
       return res.status(202).json({ error: 'Audit still in progress', code: 'AUDIT_IN_PROGRESS', status: audit.status });
     }
 
+    // Detect target language: ?lang= query param overrides Accept-Language header.
+    const lang = (req.query.lang as string) || parseAcceptLanguage(req.headers['accept-language']);
+
+    let reportHtml: string;
+    try {
+      reportHtml = await renderLocalizedReport(audit, lang, groq);
+    } catch (err) {
+      console.error(`[Report] Localized render failed for ${req.params.id}/${lang}:`, err);
+      reportHtml = audit.report_html as string;
+    }
+
     const verified = isEmailVerified(req.params.id);
-    const reportHtml = audit.report_html as string;
 
     if (verified) {
       res.setHeader('Content-Type', 'text/html');
       res.send(reportHtml);
     } else {
-      // Inject sticky verify bar into the report
-      const verifyWidget = `
-        <style>
-          .report-blur-gate > *:not(.verify-sticky) {
-            filter: blur(5px); -webkit-filter: blur(5px);
-            pointer-events: none; user-select: none;
-          }
-          .verify-sticky {
-            position: sticky; top: 0; z-index: 9999;
-            background: #070F2D; padding: 16px 20px;
-            box-shadow: 0 4px 24px rgba(7,15,45,0.3);
-            font-family: 'Open Sans', -apple-system, sans-serif;
-          }
-          .verify-inner {
-            max-width: 600px; margin: 0 auto;
-            display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-            justify-content: center;
-          }
-          .verify-text {
-            color: white; flex: 1; min-width: 200px;
-          }
-          .verify-text h3 {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            font-size: 16px; font-weight: 800; margin: 0 0 2px;
-          }
-          .verify-text p { font-size: 12px; opacity: 0.7; margin: 0; }
-          .verify-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-          .verify-form input {
-            width: 140px; padding: 10px 12px; border: 2px solid rgba(255,255,255,0.2);
-            border-radius: 10px; font-size: 18px; text-align: center;
-            letter-spacing: 6px; font-weight: 700; color: white;
-            background: rgba(255,255,255,0.1); outline: none;
-            font-family: 'Plus Jakarta Sans', monospace;
-          }
-          .verify-form input:focus { border-color: #EC5F29; background: rgba(255,255,255,0.15); }
-          .verify-form input::placeholder { color: rgba(255,255,255,0.3); }
-          .verify-form button {
-            padding: 10px 20px; border: none; border-radius: 100px;
-            background: linear-gradient(90deg, #dd974b, #db501a); color: white;
-            font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap;
-            font-family: 'Plus Jakarta Sans', sans-serif;
-          }
-          .verify-form button:hover { opacity: 0.9; }
-          .verify-form button:disabled { opacity: 0.5; cursor: not-allowed; }
-          .verify-error { color: #fca5a5; font-size: 12px; display: none; text-align: center; width: 100%; margin-top: 4px; }
-          .verify-resend { color: rgba(255,255,255,0.5); font-size: 11px; text-align: center; width: 100%; margin-top: 6px; }
-          .verify-resend a { color: #EC5F29; cursor: pointer; text-decoration: underline; }
-          @media (max-width: 500px) {
-            .verify-inner { flex-direction: column; text-align: center; }
-            .verify-text { min-width: auto; }
-            .verify-form { justify-content: center; width: 100%; }
-            .verify-form input { width: 120px; }
-          }
-        </style>
-        <div class="verify-sticky" id="verifySticky">
-          <div class="verify-inner">
-            <div class="verify-text">
-              <h3>\u{1F512} Verifica tu email</h3>
-              <p>Introduce el codigo de 6 digitos enviado a tu email</p>
-            </div>
-            <div class="verify-form">
-              <input type="text" id="verifyInput" maxlength="6" placeholder="------" autocomplete="off" inputmode="numeric">
-              <button onclick="verifyCode()" id="verifyBtn">Desbloquear</button>
-            </div>
-            <div class="verify-error" id="verifyError">Codigo incorrecto</div>
-            <div class="verify-resend">No lo recibes? <a onclick="resendCode()">Reenviar</a></div>
-          </div>
-        </div>
-        <script>
-          var auditId = window.location.pathname.split('/')[4];
-          function verifyCode() {
-            var code = document.getElementById('verifyInput').value.trim();
-            if (code.length !== 6) return;
-            var btn = document.getElementById('verifyBtn');
-            btn.disabled = true; btn.textContent = 'Verificando...';
-            fetch('/api/v1/audit/' + auditId + '/verify', {
-              method: 'POST', headers: {'Content-Type':'application/json'},
-              body: JSON.stringify({code: code})
-            }).then(function(r) { return r.json(); }).then(function(d) {
-              if (d.verified) { location.reload(); }
-              else {
-                document.getElementById('verifyError').style.display = 'block';
-                btn.disabled = false; btn.textContent = 'Desbloquear';
-              }
-            }).catch(function() {
-              btn.disabled = false; btn.textContent = 'Desbloquear';
-            });
-          }
-          function resendCode() {
-            fetch('/api/v1/audit/' + auditId + '/send-code', {method:'POST'});
-            var el = document.querySelector('.verify-resend');
-            el.innerHTML = 'Codigo reenviado!';
-            setTimeout(function() { el.innerHTML = 'No lo recibes? <a onclick="resendCode()">Reenviar</a>'; }, 3000);
-          }
-          document.getElementById('verifyInput').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') verifyCode();
-          });
-        </script>`;
-
-      // Inject sticky bar right after <body> and wrap content in blur gate
+      // Inject localised sticky verify bar into the report
+      const verifyWidget = await getLocalizedVerifyGate(lang, groq);
       const withGate = reportHtml
         .replace('<body>', '<body><div class="report-blur-gate">' + verifyWidget)
         .replace('</body>', '</div></body>');
@@ -304,6 +362,30 @@ async function main() {
   // Health check
   app.get('/api/v1/health', (_req, res) => {
     res.json({ status: 'ok', version: '0.1.0' });
+  });
+
+  // Preview report with mock data (for UI/CSS testing — no DB, no verify gate).
+  // Supports ?lang=fr to test translations, or falls back to Accept-Language.
+  app.get('/preview', async (req, res) => {
+    const lang = (req.query.lang as string) || parseAcceptLanguage(req.headers['accept-language']);
+    const cacheKey = `preview|${normalizeLangCode(lang)}`;
+    const cached = getCachedReport(cacheKey);
+
+    let html: string;
+    if (cached) {
+      html = cached;
+    } else {
+      try {
+        html = await translateAndRender(buildMockReportInput(), lang, groq);
+      } catch (err) {
+        console.error(`[Preview] Translation failed for lang=${lang}:`, err);
+        html = generateReportHtml({ ...buildMockReportInput(), lang: normalizeLangCode(lang) });
+      }
+      setCachedReport(cacheKey, html);
+    }
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
   });
 
   // Start server
@@ -358,6 +440,7 @@ async function runAudit(
     mockups: pipelineResult.mockups,
     analyses: pipelineResult.analyses,
     date: new Date().toISOString().split('T')[0],
+    lang: 'es',
   });
 
   // Step 4: Save
@@ -367,12 +450,56 @@ async function runAudit(
     JSON.stringify(pipelineResult.scores),
     JSON.stringify(pipelineResult.quickWins),
     JSON.stringify(pipelineResult.mockups),
+    JSON.stringify(pipelineResult.analyses),
     reportHtml,
   );
   saveDatabase(DB_PATH);
 
   addMessage('Audit complete!');
   progress.status = 'completed';
+}
+
+// ─── Mock data for /preview endpoint ───
+function buildMockReportInput() {
+  const mkScore = (value: number) => ({
+    value,
+    label: (value >= 80 ? 'excellent' : value >= 65 ? 'good' : value >= 50 ? 'fair' : value >= 35 ? 'poor' : 'critical') as 'critical' | 'poor' | 'fair' | 'good' | 'excellent',
+  });
+  return {
+    url: 'https://example.com',
+    globalScore: 62,
+    date: new Date().toISOString().split('T')[0],
+    scores: {
+      visualHierarchy: mkScore(58),
+      uxHeuristics: mkScore(71),
+      copyMessaging: mkScore(45),
+      trustSignals: mkScore(80),
+      mobileExperience: mkScore(63),
+      performance: mkScore(55),
+    },
+    quickWins: [
+      { rank: 1, title: 'CTA principal poco visible', problem: 'El boton de "Comprar ahora" se confunde con el fondo y los usuarios no lo encuentran rapido.', recommendation: 'Cambiar a color naranja contrastado, aumentar tamano un 20% y anadir microcopy "Envio gratis".', impact: 'high' as const, effort: 'low' as const, category: 'visualHierarchy' as const, priorityScore: 9 },
+      { rank: 2, title: 'Falta prueba social en hero', problem: 'No hay testimonios ni numero de clientes visible above the fold.', recommendation: 'Anadir badge "+5.000 clientes confian en nosotros" debajo del CTA principal.', impact: 'high' as const, effort: 'low' as const, category: 'trustSignals' as const, priorityScore: 9 },
+      { rank: 3, title: 'Formulario con demasiados campos', problem: 'El formulario de contacto pide 8 campos, lo que reduce la tasa de envio.', recommendation: 'Reducir a 3 campos esenciales: nombre, email, mensaje. Mover el resto a un segundo paso.', impact: 'medium' as const, effort: 'medium' as const, category: 'uxHeuristics' as const, priorityScore: 7 },
+      { rank: 4, title: 'Headline poco claro', problem: 'El titulo principal habla de tecnologia, no de beneficios al usuario.', recommendation: 'Reescribir enfocandose en el valor: "Ahorra 3 horas al dia automatizando X".', impact: 'high' as const, effort: 'low' as const, category: 'copyMessaging' as const, priorityScore: 9 },
+      { rank: 5, title: 'Imagenes sin lazy loading', problem: 'La home carga 18 imagenes a la vez, ralentizando el LCP.', recommendation: 'Anadir loading="lazy" a imagenes below the fold y usar formatos modernos (WebP).', impact: 'medium' as const, effort: 'low' as const, category: 'performance' as const, priorityScore: 8 },
+      { rank: 6, title: 'Menu mobile dificil de usar', problem: 'El menu hamburguesa tiene texto muy pequeno y los enlaces estan muy juntos.', recommendation: 'Aumentar tamano de fuente a 16px y separacion vertical a minimo 12px.', impact: 'medium' as const, effort: 'low' as const, category: 'mobileExperience' as const, priorityScore: 7 },
+    ],
+    mockups: [
+      { title: 'Hero rediseado con CTA destacado', description: 'Nueva propuesta visual del hero con CTA naranja, headline orientado a beneficios y badge de prueba social.', relatedQuickWin: 1, htmlContent: '<div style="background:linear-gradient(135deg,#070F2D,#1a2347);padding:60px 40px;border-radius:12px;text-align:center;color:white"><h1 style="font-size:36px;font-weight:800;margin-bottom:12px">Ahorra 3 horas al dia automatizando tu trabajo</h1><p style="opacity:0.7;margin-bottom:24px">Mas de 5.000 empresas ya lo hacen</p><button style="background:linear-gradient(90deg,#dd974b,#db501a);color:white;padding:16px 40px;border:none;border-radius:100px;font-size:18px;font-weight:700;cursor:pointer">Empezar gratis ahora</button><p style="font-size:12px;opacity:0.5;margin-top:12px">Sin tarjeta de credito. Cancela cuando quieras.</p></div>' },
+      { title: 'Formulario simplificado', description: 'Formulario de 3 campos en vez de 8, con focus inmediato y boton ancho.', relatedQuickWin: 3, htmlContent: '<div style="background:white;padding:32px;border-radius:12px;border:1px solid #e2e4ea;max-width:400px;margin:0 auto"><h3 style="margin-bottom:20px;color:#070F2D">Contactanos</h3><input style="width:100%;padding:12px;border:1px solid #e2e4ea;border-radius:8px;margin-bottom:12px" placeholder="Nombre"><input style="width:100%;padding:12px;border:1px solid #e2e4ea;border-radius:8px;margin-bottom:12px" placeholder="Email"><textarea style="width:100%;padding:12px;border:1px solid #e2e4ea;border-radius:8px;margin-bottom:12px" placeholder="Mensaje" rows="3"></textarea><button style="width:100%;background:#EC5F29;color:white;padding:14px;border:none;border-radius:8px;font-weight:700">Enviar</button></div>' },
+    ],
+    analyses: (['visualHierarchy','uxHeuristics','copyMessaging','trustSignals','mobileExperience','performance'] as const).map((cat) => ({
+      agentName: `Mock ${cat} agent`,
+      category: cat,
+      score: mkScore(60),
+      executionTimeMs: 1234,
+      findings: [
+        { title: 'Hallazgo de ejemplo', description: 'Esta es una descripcion mock para previsualizar el informe sin necesidad de correr una auditoria real.', severity: 'warning' as const, recommendation: 'Recomendacion mock para probar el layout del informe.' },
+        { title: 'Otro hallazgo', description: 'Segundo hallazgo de ejemplo con texto mas largo para verificar como se ve el informe con contenido realista. Lorem ipsum dolor sit amet consectetur adipiscing elit.', severity: 'info' as const, recommendation: 'Aplicar buenas practicas estandar.' },
+      ],
+    })),
+  };
 }
 
 main().catch(console.error);

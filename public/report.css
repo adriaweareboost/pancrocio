@@ -1,0 +1,126 @@
+/* PanCROcio Report — shared CSS extracted from report-generator.ts */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: #f8f9fb; color: #46495C; line-height: 1.6; -webkit-text-size-adjust: 100%; }
+.category-bar-link:hover { background-color: #f8f9fb; }
+.category-bar-link:focus { outline: 2px solid #EC5F29; outline-offset: 2px; }
+h1, h2, h3 { font-family: 'Plus Jakarta Sans', sans-serif; }
+img, svg { max-width: 100%; height: auto; }
+
+/* Layout: report + sidebar */
+.page-wrapper { max-width: 1120px; margin: 0 auto; padding: 0 16px 40px; display: flex; gap: 24px; align-items: flex-start; }
+.report-main { flex: 1; min-width: 0; max-width: 100%; overflow-x: hidden; }
+
+/* Desktop sidebar — sticky that follows the scroll */
+.sidebar-lead {
+  width: 280px; flex-shrink: 0;
+  position: -webkit-sticky; position: sticky; top: 24px;
+  align-self: flex-start;
+  max-height: calc(100vh - 48px); overflow-y: auto;
+  background: white; border-radius: 20px; padding: 24px;
+  box-shadow: 0 4px 24px rgba(7,15,45,0.10);
+  z-index: 10;
+  scrollbar-width: thin; scrollbar-color: #e2e4ea transparent;
+}
+.sidebar-lead::-webkit-scrollbar { width: 6px; }
+.sidebar-lead::-webkit-scrollbar-track { background: transparent; }
+.sidebar-lead::-webkit-scrollbar-thumb { background: #e2e4ea; border-radius: 3px; }
+
+/* Mobile floating bubble */
+.mobile-bubble {
+  display: none; position: fixed; bottom: 20px; right: 20px; z-index: 1000;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: linear-gradient(135deg, #dd974b, #db501a);
+  box-shadow: 0 6px 20px rgba(219,80,26,0.4);
+  cursor: pointer; border: none;
+  animation: bubblePulse 2s infinite;
+}
+.mobile-bubble svg { width: 28px; height: 28px; }
+
+/* Mobile lead popup */
+.mobile-lead-popup {
+  display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 1001;
+  background: white; border-radius: 20px 20px 0 0; padding: 28px 20px 32px;
+  box-shadow: 0 -8px 40px rgba(7,15,45,0.15);
+  transform: translateY(100%); transition: transform 0.3s ease;
+}
+.mobile-lead-popup.open { transform: translateY(0); }
+.mobile-overlay {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: rgba(7,15,45,0.4); opacity: 0; transition: opacity 0.3s;
+}
+.mobile-overlay.open { opacity: 1; }
+
+@keyframes bubblePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+/* Responsive */
+@media (max-width: 860px) {
+  .page-wrapper { flex-direction: column; padding: 0 12px 32px; }
+  .sidebar-lead { display: none; }
+  .mobile-bubble { display: flex; align-items: center; justify-content: center; }
+}
+@media (max-width: 600px) {
+  .page-wrapper { padding: 0 6px 24px; }
+  .report-main > div { border-radius: 14px !important; padding-left: 16px !important; padding-right: 16px !important; }
+  .report-header { padding: 28px 16px 36px !important; }
+  .report-header h1 { font-size: 26px !important; }
+  .qw-card-head { flex-direction: column !important; align-items: flex-start !important; }
+  .qw-badges { margin-top: 8px; }
+  .finding-head { flex-direction: column !important; align-items: flex-start !important; gap: 6px !important; }
+  .contact-bottom { padding: 28px 16px !important; }
+  .contact-bottom-inner { padding: 20px 16px !important; }
+  .score-gauge { width: 120px !important; height: 120px !important; }
+  .score-gauge-number { font-size: 30px !important; }
+  .section-heading h2 { font-size: 18px !important; }
+}
+@media (min-width: 861px) {
+  .mobile-bubble, .mobile-lead-popup, .mobile-overlay { display: none !important; }
+}
+
+/* Shared form styles */
+.lead-form input, .lead-form textarea {
+  width: 100%; padding: 10px 14px; border: 1px solid #e2e4ea; border-radius: 10px;
+  font-size: 14px; font-family: inherit; outline: none; color: #070F2D;
+  transition: border-color 0.2s;
+}
+.lead-form input:focus, .lead-form textarea:focus {
+  border-color: #EC5F29; box-shadow: 0 0 0 3px rgba(236,95,41,0.12);
+}
+.lead-form input::placeholder, .lead-form textarea::placeholder { color: #9ca3af; }
+.lead-form label {
+  display: block; font-size: 12px; font-weight: 600; color: #070F2D;
+  margin-bottom: 4px; font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.lead-form .field { margin-bottom: 14px; }
+.lead-form button {
+  width: 100%; padding: 12px; border: none; border-radius: 100px;
+  background: linear-gradient(90deg, #dd974b, #db501a); color: white;
+  font-weight: 700; font-size: 14px; font-family: 'Plus Jakarta Sans', sans-serif;
+  cursor: pointer; transition: transform 0.15s, box-shadow 0.2s;
+}
+.lead-form button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(219,80,26,0.35); }
+.lead-form button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.lead-form .privacy-row {
+  display: flex; align-items: flex-start; gap: 8px; margin-bottom: 14px; font-size: 11px; color: #46495C;
+}
+.lead-form .privacy-row input[type="checkbox"] {
+  width: 16px; height: 16px; margin-top: 1px; flex-shrink: 0; accent-color: #EC5F29;
+}
+.lead-form .privacy-row a { color: #EC5F29; text-decoration: underline; }
+.lead-form .form-success {
+  text-align: center; padding: 20px 0;
+}
+.lead-form .form-success .check {
+  width: 48px; height: 48px; background: #22c55e; border-radius: 50%; margin: 0 auto 12px;
+  display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;
+}
+
+@media print {
+  body { background: white; }
+  .sidebar-lead, .mobile-bubble, .mobile-lead-popup, .mobile-overlay { display: none !important; }
+  .page-wrapper { max-width: 800px; }
+}
