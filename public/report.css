@@ -10,22 +10,22 @@ img, svg { max-width: 100%; height: auto; }
 
 /* Layout: report + sidebar */
 .page-wrapper { max-width: 1120px; margin: 0 auto; padding: 0 16px 40px; display: flex; gap: 24px; align-items: flex-start; }
-.report-main { flex: 1; min-width: 0; max-width: 100%; overflow-x: hidden; }
+.report-main { flex: 1 1 auto; min-width: 0; max-width: 100%; }
 
 /* Desktop sidebar — sticky that follows the scroll */
 .sidebar-lead {
-  width: 280px; flex-shrink: 0;
-  position: -webkit-sticky; position: sticky; top: 24px;
-  align-self: flex-start;
-  max-height: calc(100vh - 48px); overflow-y: auto;
-  background: white; border-radius: 20px; padding: 24px;
+  width: 280px;
+  flex: 0 0 280px;
+  align-self: flex-start !important;
+  position: -webkit-sticky;
+  position: sticky;
+  top: 24px;
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
   box-shadow: 0 4px 24px rgba(7,15,45,0.10);
   z-index: 10;
-  scrollbar-width: thin; scrollbar-color: #e2e4ea transparent;
 }
-.sidebar-lead::-webkit-scrollbar { width: 6px; }
-.sidebar-lead::-webkit-scrollbar-track { background: transparent; }
-.sidebar-lead::-webkit-scrollbar-thumb { background: #e2e4ea; border-radius: 3px; }
 
 /* Mobile floating bubble */
 .mobile-bubble {

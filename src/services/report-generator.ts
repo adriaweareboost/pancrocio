@@ -48,6 +48,13 @@ export interface ReportUiStrings {
   pancrocioCommentGood: string;
   pancrocioCommentFair: string;
   pancrocioCommentPoor: string;
+  // Category labels (translatable)
+  catVisualHierarchy: string;
+  catUxHeuristics: string;
+  catCopyMessaging: string;
+  catTrustSignals: string;
+  catMobileExperience: string;
+  catPerformance: string;
 }
 
 export const DEFAULT_UI_STRINGS: ReportUiStrings = {
@@ -96,7 +103,25 @@ export const DEFAULT_UI_STRINGS: ReportUiStrings = {
   pancrocioCommentGood: 'Base solida! He encontrado areas clave donde pequenos cambios pueden marcar la diferencia.',
   pancrocioCommentFair: 'Hay potencial real aqui. Dejame mostrarte los quick wins que moveran la aguja.',
   pancrocioCommentPoor: 'No te preocupes — todo gran sitio empezo en algun lugar. Estas son las mejoras de alto impacto a priorizar.',
+  catVisualHierarchy: 'Jerarquia Visual',
+  catUxHeuristics: 'Heuristicas UX',
+  catCopyMessaging: 'Copy y Mensajes',
+  catTrustSignals: 'Senales de Confianza',
+  catMobileExperience: 'Experiencia Movil',
+  catPerformance: 'Rendimiento',
 };
+
+/** Map a category key to its translated label using a uiStrings object. */
+function categoryLabel(key: keyof CategoryScores, ui: ReportUiStrings): string {
+  switch (key) {
+    case 'visualHierarchy': return ui.catVisualHierarchy;
+    case 'uxHeuristics': return ui.catUxHeuristics;
+    case 'copyMessaging': return ui.catCopyMessaging;
+    case 'trustSignals': return ui.catTrustSignals;
+    case 'mobileExperience': return ui.catMobileExperience;
+    case 'performance': return ui.catPerformance;
+  }
+}
 
 interface ReportInput {
   url: string;
@@ -134,6 +159,10 @@ const CATEGORY_ICONS: Record<keyof CategoryScores, string> = {
   mobileExperience: '\u{1F4F1}',
   performance: '\u{26A1}',
 };
+
+// Static asset cache-busting token — bumped on each server start so the
+// browser always fetches the latest CSS/JS even if URL is the same.
+const ASSET_VERSION = String(Date.now());
 
 // PanCROcio inline SVG (simplified for report embedding)
 const PANCROCIO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" width="80" height="96" style="vertical-align:middle">
@@ -279,8 +308,9 @@ export function generateReportHtml(input: ReportInput): string {
     },
   }).replace(/</g, '\\u003c');
 
-  const categoryBars = Object.entries(CATEGORY_LABELS)
-    .map(([key, label]) => renderCategoryBar(label, key as keyof CategoryScores, scores[key as keyof CategoryScores]))
+  const categoryKeys = Object.keys(CATEGORY_LABELS) as (keyof CategoryScores)[];
+  const categoryBars = categoryKeys
+    .map((key) => renderCategoryBar(categoryLabel(key, ui), key, scores[key]))
     .join('');
 
   const quickWinCards = quickWins.map((qw) => `
@@ -290,7 +320,7 @@ export function generateReportHtml(input: ReportInput): string {
         <h3 id="qw-${qw.rank}-title" style="margin:0;font-size:16px;color:#070F2D;flex:1;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700">${escapeHtml(qw.title)}</h3>
         <div class="qw-badges" style="display:flex;gap:6px;flex-wrap:wrap">
           ${impactBadge(qw.impact)}
-          <span style="background:#070F2D10;color:#070F2D;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600">${CATEGORY_ICONS[qw.category] || ''} ${CATEGORY_LABELS[qw.category] || qw.category}</span>
+          <span style="background:#070F2D10;color:#070F2D;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600">${CATEGORY_ICONS[qw.category] || ''} ${escapeHtml(categoryLabel(qw.category, ui))}</span>
         </div>
       </header>
       <div style="background:#fef7f2;border-radius:10px;padding:14px 16px;margin-bottom:10px;border-left:4px solid #EC5F29">
@@ -320,7 +350,7 @@ export function generateReportHtml(input: ReportInput): string {
     return `
       <section id="cat-${analysis.category}" aria-labelledby="${headingId}" style="margin-bottom:32px;scroll-margin-top:24px">
         <header style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #e2e4ea;padding-bottom:10px;margin-bottom:16px">
-          <h3 id="${headingId}" style="font-size:18px;color:#070F2D;margin:0;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700"><span aria-hidden="true">${icon}</span> ${CATEGORY_LABELS[analysis.category] || analysis.category}</h3>
+          <h3 id="${headingId}" style="font-size:18px;color:#070F2D;margin:0;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700"><span aria-hidden="true">${icon}</span> ${escapeHtml(categoryLabel(analysis.category, ui))}</h3>
           <span style="font-size:20px;font-weight:800;color:${scoreColor(analysis.score.value)};font-family:'Plus Jakarta Sans',sans-serif">${analysis.score.value}<span style="font-size:13px;font-weight:600;color:#9ca3af">/100</span></span>
         </header>
         ${findings}
@@ -359,7 +389,7 @@ export function generateReportHtml(input: ReportInput): string {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="dns-prefetch" href="https://www.weareboost.online">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/report.css">
+  <link rel="stylesheet" href="/report.css?v=${ASSET_VERSION}">
   <script type="application/ld+json">${jsonLd}</script>
 </head>
 <body>
@@ -582,7 +612,7 @@ export function generateReportHtml(input: ReportInput): string {
       errorAlert: '${escapeJsString(ui.formErrorAlert)}'
     };
   </script>
-  <script src="/report.js" defer></script>
+  <script src="/report.js?v=${ASSET_VERSION}" defer></script>
 </body>
 </html>`;
 }
