@@ -1,34 +1,59 @@
-import initSqlJs, { Database } from 'sql.js';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+// PanCROcio database — PostgreSQL via node-postgres (Supabase-hosted).
+//
+// All functions are async because pg.query is async. The schema is
+// idempotent (CREATE TABLE IF NOT EXISTS) so the first server boot
+// against a fresh Supabase project bootstraps everything.
+//
+// Connection string is read from DATABASE_URL (Supabase pooler URI in
+// transaction mode). SSL is enabled with relaxed cert verification
+// because Supabase pooler uses a wildcard cert.
 
-let db: Database;
+import pg from 'pg';
+const { Pool } = pg;
+type PoolType = pg.Pool;
 
-export async function initDatabase(dbPath: string): Promise<Database> {
-  const SQL = await initSqlJs();
-  const dir = dirname(dbPath);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+let pool: PoolType | null = null;
 
-  if (existsSync(dbPath)) {
-    const buffer = readFileSync(dbPath);
-    db = new SQL.Database(buffer);
-  } else {
-    db = new SQL.Database();
+function getPool(): PoolType {
+  if (!pool) {
+    throw new Error('Database not initialised. Call initDatabase() first.');
+  }
+  return pool;
+}
+
+/**
+ * Initialise the connection pool and ensure the schema exists.
+ * The dbPath argument is kept for backwards compatibility with the
+ * SQLite-era signature; it is ignored.
+ */
+export async function initDatabase(_dbPath?: string): Promise<void> {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is required');
   }
 
-  db.run(`
+  pool = new Pool({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+    max: 10,
+    idleTimeoutMillis: 30_000,
+  });
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS leads (
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL,
       url TEXT NOT NULL,
-      created_at TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       audit_id TEXT,
-      email_verified INTEGER NOT NULL DEFAULT 0,
+      email_verified BOOLEAN NOT NULL DEFAULT false,
       verify_code TEXT
     )
   `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS leads_email_idx ON leads(email)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS leads_audit_id_idx ON leads(audit_id)`);
 
-  db.run(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS audits (
       id TEXT PRIMARY KEY,
       lead_id TEXT NOT NULL,
@@ -41,231 +66,223 @@ export async function initDatabase(dbPath: string): Promise<Database> {
       mockups_json TEXT,
       analyses_json TEXT,
       report_html TEXT,
-      created_at TEXT NOT NULL,
-      completed_at TEXT
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      completed_at TIMESTAMPTZ
     )
   `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS audits_status_idx ON audits(status)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS audits_lead_id_idx ON audits(lead_id)`);
 
-  // Migrate: add verify columns if missing
-  try {
-    db.run(`ALTER TABLE leads ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0`);
-  } catch { /* column already exists */ }
-  try {
-    db.run(`ALTER TABLE leads ADD COLUMN verify_code TEXT`);
-  } catch { /* column already exists */ }
-  // Migrate: add analyses_json column for translator support (re-rendering needs analyses)
-  try {
-    db.run(`ALTER TABLE audits ADD COLUMN analyses_json TEXT`);
-  } catch { /* column already exists */ }
-
-  db.run(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS audit_translations (
-      audit_id TEXT NOT NULL,
+      audit_id TEXT NOT NULL REFERENCES audits(id) ON DELETE CASCADE,
       lang TEXT NOT NULL,
       html TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      PRIMARY KEY (audit_id, lang),
-      FOREIGN KEY (audit_id) REFERENCES audits(id) ON DELETE CASCADE
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (audit_id, lang)
     )
   `);
 
-  db.run(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS audit_pdfs (
-      audit_id TEXT NOT NULL,
+      audit_id TEXT NOT NULL REFERENCES audits(id) ON DELETE CASCADE,
       lang TEXT NOT NULL,
-      pdf BLOB NOT NULL,
-      created_at TEXT NOT NULL,
-      PRIMARY KEY (audit_id, lang),
-      FOREIGN KEY (audit_id) REFERENCES audits(id) ON DELETE CASCADE
+      pdf BYTEA NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (audit_id, lang)
     )
   `);
-
-  saveDatabase(dbPath);
-  return db;
 }
 
-export function saveDatabase(dbPath: string): void {
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  writeFileSync(dbPath, buffer);
+/**
+ * No-op kept for backwards compatibility with the SQLite era. Postgres
+ * persists every committed transaction automatically; callers no longer
+ * need to flush state manually.
+ */
+export async function saveDatabase(_dbPath?: string): Promise<void> {
+  // intentional no-op
 }
 
-export function getDb(): Database {
-  return db;
+export async function closeDatabase(): Promise<void> {
+  if (pool) {
+    await pool.end();
+    pool = null;
+  }
 }
 
-export function isUrlAudited(normalizedUrl: string): boolean {
-  const result = db.exec(
-    `SELECT id FROM audits WHERE normalized_url = ? AND status = 'completed'`,
-    [normalizedUrl]
+// ─── Audits / Leads CRUD ───
+
+export async function isUrlAudited(normalizedUrl: string): Promise<boolean> {
+  const result = await getPool().query(
+    `SELECT id FROM audits WHERE normalized_url = $1 AND status = 'completed'`,
+    [normalizedUrl],
   );
-  return result.length > 0 && result[0].values.length > 0;
+  return result.rowCount !== null && result.rowCount > 0;
 }
 
-export function createLead(id: string, email: string, url: string): void {
-  db.run(
-    `INSERT INTO leads (id, email, url, created_at) VALUES (?, ?, ?, ?)`,
-    [id, email, url, new Date().toISOString()]
+export async function createLead(id: string, email: string, url: string): Promise<void> {
+  await getPool().query(
+    `INSERT INTO leads (id, email, url) VALUES ($1, $2, $3)`,
+    [id, email, url],
   );
 }
 
-export function createAudit(
+export async function createAudit(
   id: string,
   leadId: string,
   url: string,
-  normalizedUrl: string
-): void {
-  db.run(
-    `INSERT INTO audits (id, lead_id, url, normalized_url, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)`,
-    [id, leadId, url, normalizedUrl, new Date().toISOString()]
+  normalizedUrl: string,
+): Promise<void> {
+  await getPool().query(
+    `INSERT INTO audits (id, lead_id, url, normalized_url, status) VALUES ($1, $2, $3, $4, 'pending')`,
+    [id, leadId, url, normalizedUrl],
   );
-  db.run(`UPDATE leads SET audit_id = ? WHERE id = ?`, [id, leadId]);
+  await getPool().query(`UPDATE leads SET audit_id = $1 WHERE id = $2`, [id, leadId]);
 }
 
-export function updateAuditStatus(id: string, status: string): void {
-  db.run(`UPDATE audits SET status = ? WHERE id = ?`, [status, id]);
+export async function updateAuditStatus(id: string, status: string): Promise<void> {
+  await getPool().query(`UPDATE audits SET status = $1 WHERE id = $2`, [status, id]);
 }
 
-export function completeAudit(
+export async function completeAudit(
   id: string,
   globalScore: number,
   scoresJson: string,
   quickWinsJson: string,
   mockupsJson: string,
   analysesJson: string,
-  reportHtml: string
-): void {
-  db.run(
-    `UPDATE audits SET status = 'completed', global_score = ?, scores_json = ?, quick_wins_json = ?, mockups_json = ?, analyses_json = ?, report_html = ?, completed_at = ? WHERE id = ?`,
-    [globalScore, scoresJson, quickWinsJson, mockupsJson, analysesJson, reportHtml, new Date().toISOString(), id]
+  reportHtml: string,
+): Promise<void> {
+  await getPool().query(
+    `UPDATE audits
+       SET status = 'completed',
+           global_score = $1,
+           scores_json = $2,
+           quick_wins_json = $3,
+           mockups_json = $4,
+           analyses_json = $5,
+           report_html = $6,
+           completed_at = NOW()
+     WHERE id = $7`,
+    [globalScore, scoresJson, quickWinsJson, mockupsJson, analysesJson, reportHtml, id],
   );
 }
 
-export function countAuditsByEmail(email: string): number {
-  const result = db.exec(
-    `SELECT COUNT(*) as count FROM leads l JOIN audits a ON l.audit_id = a.id WHERE l.email = ?`,
-    [email]
+export async function countAuditsByEmail(email: string): Promise<number> {
+  const result = await getPool().query(
+    `SELECT COUNT(*)::int AS count
+       FROM leads l
+       JOIN audits a ON l.audit_id = a.id
+      WHERE l.email = $1`,
+    [email],
   );
-  if (result.length === 0 || result[0].values.length === 0) return 0;
-  return result[0].values[0][0] as number;
+  return result.rows[0]?.count ?? 0;
 }
 
-export function getAudit(id: string): Record<string, unknown> | null {
-  const result = db.exec(`SELECT * FROM audits WHERE id = ?`, [id]);
-  if (result.length === 0 || result[0].values.length === 0) return null;
-  const columns = result[0].columns;
-  const values = result[0].values[0];
-  const row: Record<string, unknown> = {};
-  columns.forEach((col: string, i: number) => { row[col] = values[i]; });
-  return row;
+export async function getAudit(id: string): Promise<Record<string, unknown> | null> {
+  const result = await getPool().query(`SELECT * FROM audits WHERE id = $1`, [id]);
+  return result.rows[0] ?? null;
 }
 
-export function recoverOrphanedAudits(): number {
+export async function recoverOrphanedAudits(): Promise<number> {
   const orphanStatuses = ['pending', 'scraping', 'analyzing', 'synthesizing', 'generating_report'];
-  const placeholders = orphanStatuses.map(() => '?').join(',');
-  const result = db.exec(
-    `SELECT COUNT(*) FROM audits WHERE status IN (${placeholders})`,
-    orphanStatuses,
+  const result = await getPool().query(
+    `UPDATE audits SET status = 'failed' WHERE status = ANY($1::text[]) RETURNING id`,
+    [orphanStatuses],
   );
-  const count = (result[0]?.values[0]?.[0] as number) || 0;
-
-  if (count > 0) {
-    db.run(
-      `UPDATE audits SET status = 'failed' WHERE status IN (${placeholders})`,
-      orphanStatuses,
-    );
-  }
-  return count;
+  return result.rowCount ?? 0;
 }
 
-export function setVerifyCode(leadId: string, code: string): void {
-  db.run(`UPDATE leads SET verify_code = ? WHERE id = ?`, [code, leadId]);
+// ─── Email verification ───
+
+export async function setVerifyCode(leadId: string, code: string): Promise<void> {
+  await getPool().query(`UPDATE leads SET verify_code = $1 WHERE id = $2`, [code, leadId]);
 }
 
-export function verifyEmailCode(auditId: string, code: string): boolean {
-  // Master code for testing/demo
-  const isMaster = code === '000000';
-  const result = db.exec(
-    isMaster
-      ? `SELECT l.id FROM leads l JOIN audits a ON l.audit_id = a.id WHERE a.id = ?`
-      : `SELECT l.id FROM leads l JOIN audits a ON l.audit_id = a.id WHERE a.id = ? AND l.verify_code = ?`,
-    isMaster ? [auditId] : [auditId, code],
-  );
-  if (result.length === 0 || result[0].values.length === 0) return false;
-  const leadId = result[0].values[0][0] as string;
-  db.run(`UPDATE leads SET email_verified = 1 WHERE id = ?`, [leadId]);
+export async function verifyEmailCode(auditId: string, code: string): Promise<boolean> {
+  // Master code only allowed in non-production environments.
+  const isMaster = code === '000000' && process.env.NODE_ENV !== 'production';
+  const sql = isMaster
+    ? `SELECT l.id FROM leads l JOIN audits a ON l.audit_id = a.id WHERE a.id = $1`
+    : `SELECT l.id FROM leads l JOIN audits a ON l.audit_id = a.id WHERE a.id = $1 AND l.verify_code = $2`;
+  const params = isMaster ? [auditId] : [auditId, code];
+  const result = await getPool().query(sql, params);
+  if (result.rowCount === 0) return false;
+  const leadId = result.rows[0].id as string;
+  await getPool().query(`UPDATE leads SET email_verified = true WHERE id = $1`, [leadId]);
   return true;
 }
 
-export function isEmailVerified(auditId: string): boolean {
-  const result = db.exec(
-    `SELECT l.email_verified FROM leads l JOIN audits a ON l.audit_id = a.id WHERE a.id = ?`,
+export async function isEmailVerified(auditId: string): Promise<boolean> {
+  const result = await getPool().query(
+    `SELECT l.email_verified
+       FROM leads l
+       JOIN audits a ON l.audit_id = a.id
+      WHERE a.id = $1`,
     [auditId],
   );
-  if (result.length === 0 || result[0].values.length === 0) return false;
-  return (result[0].values[0][0] as number) === 1;
+  return result.rows[0]?.email_verified === true;
 }
 
-export function getLeadEmail(auditId: string): string | null {
-  const result = db.exec(
-    `SELECT l.email FROM leads l JOIN audits a ON l.audit_id = a.id WHERE a.id = ?`,
+export async function getLeadEmail(auditId: string): Promise<string | null> {
+  const result = await getPool().query(
+    `SELECT l.email
+       FROM leads l
+       JOIN audits a ON l.audit_id = a.id
+      WHERE a.id = $1`,
     [auditId],
   );
-  if (result.length === 0 || result[0].values.length === 0) return null;
-  return result[0].values[0][0] as string;
+  return result.rows[0]?.email ?? null;
 }
 
-export function deleteAuditByUrl(normalizedUrl: string): boolean {
-  const result = db.exec(
-    `SELECT id, lead_id FROM audits WHERE normalized_url = ?`,
+export async function deleteAuditByUrl(normalizedUrl: string): Promise<boolean> {
+  const result = await getPool().query(
+    `SELECT id, lead_id FROM audits WHERE normalized_url = $1`,
     [normalizedUrl],
   );
-  if (result.length === 0 || result[0].values.length === 0) return false;
-
-  const auditId = result[0].values[0][0] as string;
-  const leadId = result[0].values[0][1] as string;
-
-  db.run(`DELETE FROM audit_pdfs WHERE audit_id = ?`, [auditId]);
-  db.run(`DELETE FROM audit_translations WHERE audit_id = ?`, [auditId]);
-  db.run(`DELETE FROM audits WHERE id = ?`, [auditId]);
-  db.run(`DELETE FROM leads WHERE id = ?`, [leadId]);
+  if (result.rowCount === 0) return false;
+  const auditId = result.rows[0].id as string;
+  const leadId = result.rows[0].lead_id as string;
+  // FK ON DELETE CASCADE on audit_pdfs and audit_translations cleans those automatically.
+  await getPool().query(`DELETE FROM audits WHERE id = $1`, [auditId]);
+  await getPool().query(`DELETE FROM leads WHERE id = $1`, [leadId]);
   return true;
 }
 
 // ─── Translation cache (persistent) ───
 
-export function getStoredTranslation(auditId: string, lang: string): string | null {
-  const result = db.exec(
-    `SELECT html FROM audit_translations WHERE audit_id = ? AND lang = ?`,
+export async function getStoredTranslation(auditId: string, lang: string): Promise<string | null> {
+  const result = await getPool().query(
+    `SELECT html FROM audit_translations WHERE audit_id = $1 AND lang = $2`,
     [auditId, lang],
   );
-  if (result.length === 0 || result[0].values.length === 0) return null;
-  return result[0].values[0][0] as string;
+  return result.rows[0]?.html ?? null;
 }
 
-export function storeTranslation(auditId: string, lang: string, html: string): void {
-  db.run(
-    `INSERT OR REPLACE INTO audit_translations (audit_id, lang, html, created_at) VALUES (?, ?, ?, ?)`,
-    [auditId, lang, html, new Date().toISOString()],
+export async function storeTranslation(auditId: string, lang: string, html: string): Promise<void> {
+  await getPool().query(
+    `INSERT INTO audit_translations (audit_id, lang, html) VALUES ($1, $2, $3)
+       ON CONFLICT (audit_id, lang) DO UPDATE SET html = EXCLUDED.html, created_at = NOW()`,
+    [auditId, lang, html],
   );
 }
 
-// ─── PDF cache (persistent) ───
+// ─── PDF cache (persistent, BYTEA blob) ───
 
-export function getStoredPdf(auditId: string, lang: string): Buffer | null {
-  const result = db.exec(
-    `SELECT pdf FROM audit_pdfs WHERE audit_id = ? AND lang = ?`,
+export async function getStoredPdf(auditId: string, lang: string): Promise<Buffer | null> {
+  const result = await getPool().query(
+    `SELECT pdf FROM audit_pdfs WHERE audit_id = $1 AND lang = $2`,
     [auditId, lang],
   );
-  if (result.length === 0 || result[0].values.length === 0) return null;
-  const blob = result[0].values[0][0];
+  const blob = result.rows[0]?.pdf;
   if (!blob) return null;
-  return Buffer.from(blob as Uint8Array);
+  return Buffer.isBuffer(blob) ? blob : Buffer.from(blob);
 }
 
-export function storePdf(auditId: string, lang: string, pdf: Buffer): void {
-  db.run(
-    `INSERT OR REPLACE INTO audit_pdfs (audit_id, lang, pdf, created_at) VALUES (?, ?, ?, ?)`,
-    [auditId, lang, pdf, new Date().toISOString()],
+export async function storePdf(auditId: string, lang: string, pdf: Buffer): Promise<void> {
+  await getPool().query(
+    `INSERT INTO audit_pdfs (audit_id, lang, pdf) VALUES ($1, $2, $3)
+       ON CONFLICT (audit_id, lang) DO UPDATE SET pdf = EXCLUDED.pdf, created_at = NOW()`,
+    [auditId, lang, pdf],
   );
 }

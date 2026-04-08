@@ -17,8 +17,6 @@ RUN npx playwright install chromium --with-deps
 COPY . .
 RUN npm run build
 
-RUN mkdir -p /app/data
-
 ENV NODE_ENV=production
 ENV PORT=3000
 
