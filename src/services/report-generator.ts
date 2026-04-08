@@ -251,7 +251,9 @@ export function generateReportHtml(input: ReportInput): string {
   const seoTitle = `PanCROcio CRO Report \u2014 ${url} (${globalScore}/100)`;
   const seoDescription = `${ui.reportSubtitle} \u2014 ${url}. Score ${globalScore}/100. ${quickWins.length} quick wins, ${mockups.length} mockups, ${analyses.length} category audits.`;
   // Site origin: prefer explicit input, fall back to SITE_ORIGIN env var, default to weareboost.
-  const siteOrigin = (input.siteOrigin || process.env.SITE_ORIGIN || 'https://www.weareboost.online').replace(/\/$/, '');
+  // Defensive: strip trailing slash and prepend https:// if the user forgot the protocol.
+  const rawOrigin = (input.siteOrigin || process.env.SITE_ORIGIN || 'https://www.weareboost.online').replace(/\/$/, '');
+  const siteOrigin = /^https?:\/\//.test(rawOrigin) ? rawOrigin : `https://${rawOrigin}`;
   const canonicalUrl = `${siteOrigin}/report?u=${encodeURIComponent(input.url)}`;
   const ogImage = `${siteOrigin}/og-image.svg`;
 
