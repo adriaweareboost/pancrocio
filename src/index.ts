@@ -36,6 +36,24 @@ const reportCache = new Map<string, { html: string; createdAt: number }>();
 // In-memory verify-gate translation cache (key: lang, no TTL — strings rarely change)
 const verifyStringsCache = new Map<string, typeof DEFAULT_VERIFY_STRINGS>();
 
+// In-memory report UI strings translation cache (key: lang, no TTL)
+const uiStringsCache = new Map<string, typeof DEFAULT_UI_STRINGS>();
+
+async function getCachedUiStrings(lang: string, llm: LLMProvider): Promise<typeof DEFAULT_UI_STRINGS> {
+  const normalized = normalizeLangCode(lang);
+  if (!shouldTranslate(normalized)) return DEFAULT_UI_STRINGS;
+  const cached = uiStringsCache.get(normalized);
+  if (cached) return cached;
+  try {
+    const translated = await translateUiStrings(DEFAULT_UI_STRINGS, normalized, llm);
+    uiStringsCache.set(normalized, translated);
+    return translated;
+  } catch (err) {
+    console.warn(`[UiStrings] Translation failed for lang=${normalized}, using defaults:`, (err as Error).message);
+    return DEFAULT_UI_STRINGS;
+  }
+}
+
 async function getLocalizedVerifyGate(lang: string, llm: LLMProvider): Promise<string> {
   const normalized = normalizeLangCode(lang);
   if (!shouldTranslate(normalized)) return buildVerifyGate(DEFAULT_VERIFY_STRINGS);
@@ -97,7 +115,7 @@ async function translateAndRender(
       lang,
       llm,
     ),
-    translateUiStrings(DEFAULT_UI_STRINGS, lang, llm),
+    getCachedUiStrings(lang, llm),
   ]);
   return generateReportHtml({
     ...input,

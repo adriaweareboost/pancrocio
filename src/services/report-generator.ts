@@ -56,6 +56,13 @@ export interface ReportUiStrings {
   catMobileExperience: string;
   catPerformance: string;
   downloadPdfButton: string;
+  // Impact + severity badges (translatable)
+  impactHigh: string;
+  impactMedium: string;
+  impactLow: string;
+  severityCritical: string;
+  severityWarning: string;
+  severityInfo: string;
 }
 
 export const DEFAULT_UI_STRINGS: ReportUiStrings = {
@@ -111,6 +118,12 @@ export const DEFAULT_UI_STRINGS: ReportUiStrings = {
   catMobileExperience: 'Experiencia Movil',
   catPerformance: 'Rendimiento',
   downloadPdfButton: 'Descargar PDF',
+  impactHigh: 'IMPACTO ALTO',
+  impactMedium: 'IMPACTO MEDIO',
+  impactLow: 'IMPACTO BAJO',
+  severityCritical: 'CRITICO',
+  severityWarning: 'AVISO',
+  severityInfo: 'INFO',
 };
 
 /** Map a category key to its translated label using a uiStrings object. */
@@ -218,20 +231,32 @@ function scoreEmoji(score: number): string {
   return '\u{1F6A8}';
 }
 
-function severityBadge(severity: string): string {
+function severityBadge(severity: string, ui: ReportUiStrings): string {
   const styles: Record<string, { bg: string; text: string }> = {
     critical: { bg: '#fef2f2', text: '#dc2626' },
     warning: { bg: '#fff7ed', text: '#ea580c' },
     info: { bg: '#eff6ff', text: '#2563eb' },
   };
+  const labels: Record<string, string> = {
+    critical: ui.severityCritical,
+    warning: ui.severityWarning,
+    info: ui.severityInfo,
+  };
   const s = styles[severity] || { bg: '#f3f4f6', text: '#6b7280' };
-  return `<span style="background:${s.bg};color:${s.text};padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;border:1px solid ${s.text}20">${severity}</span>`;
+  const label = labels[severity] || severity;
+  return `<span style="background:${s.bg};color:${s.text};padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;border:1px solid ${s.text}20">${escapeHtml(label)}</span>`;
 }
 
-function impactBadge(level: string): string {
+function impactBadge(level: string, ui: ReportUiStrings): string {
   const colors: Record<string, string> = { high: '#dc2626', medium: '#ea580c', low: '#16a34a' };
+  const labels: Record<string, string> = {
+    high: ui.impactHigh,
+    medium: ui.impactMedium,
+    low: ui.impactLow,
+  };
   const c = colors[level] || '#6b7280';
-  return `<span style="background:${c};color:white;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;text-transform:uppercase">${level} IMPACT</span>`;
+  const label = labels[level] || level;
+  return `<span style="background:${c};color:white;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;text-transform:uppercase">${escapeHtml(label)}</span>`;
 }
 
 function renderScoreGauge(score: number): string {
@@ -323,7 +348,7 @@ export function generateReportHtml(input: ReportInput): string {
         <div aria-hidden="true" style="background:linear-gradient(135deg,#dd974b,#db501a);color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;font-family:'Plus Jakarta Sans',sans-serif;flex-shrink:0">${qw.rank}</div>
         <h3 id="qw-${qw.rank}-title" style="margin:0;font-size:16px;color:#070F2D;flex:1;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700">${escapeHtml(qw.title)}</h3>
         <div class="qw-badges" style="display:flex;gap:6px;flex-wrap:wrap">
-          ${impactBadge(qw.impact)}
+          ${impactBadge(qw.impact, ui)}
           <span style="background:#070F2D10;color:#070F2D;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600">${CATEGORY_ICONS[qw.category] || ''} ${escapeHtml(categoryLabel(qw.category, ui))}</span>
         </div>
       </header>
@@ -342,7 +367,7 @@ export function generateReportHtml(input: ReportInput): string {
     const findings = analysis.findings.map((f, idx) => `
       <article aria-labelledby="cat-${analysis.category}-finding-${idx}" style="border-left:4px solid ${f.severity === 'critical' ? '#dc2626' : f.severity === 'warning' ? '#ea580c' : '#2563eb'};padding:14px 18px;margin-bottom:12px;background:white;border-radius:0 12px 12px 0;box-shadow:0 1px 4px rgba(7,15,45,0.05)">
         <header class="finding-head" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-          ${severityBadge(f.severity)}
+          ${severityBadge(f.severity, ui)}
           <strong id="cat-${analysis.category}-finding-${idx}" style="font-size:14px;color:#070F2D;font-family:'Plus Jakarta Sans',sans-serif">${escapeHtml(f.title)}</strong>
         </header>
         <p style="color:#46495C;margin:4px 0;font-size:13px;line-height:1.6">${escapeHtml(f.description)}</p>
