@@ -4,13 +4,14 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation } from './services/database.js';
+import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
 import { createGroqProvider } from './services/groq.js';
 import { runPipeline } from './services/pipeline.js';
 import { generateReportHtml, DEFAULT_UI_STRINGS } from './services/report-generator.js';
 import { buildVerifyGate, DEFAULT_VERIFY_STRINGS } from './services/verify-gate.js';
+import { generateReportPdf, pdfFilename } from './services/pdf.js';
 import { parseAcceptLanguage, shouldTranslate, normalizeLangCode, translateReportData, translateUiStrings, translateVerifyStrings } from './agents/translator.js';
 import type { LLMProvider, AgentAnalysis, QuickWin, Mockup, CategoryScores } from './models/interfaces.js';
 import { normalizeUrl, isValidUrl, isValidEmail } from './utils/normalize-url.js';
@@ -74,6 +75,7 @@ interface ReportRenderInput {
   mockups: Mockup[];
   analyses: AgentAnalysis[];
   date: string;
+  pdfUrl?: string;
 }
 
 /**
@@ -153,6 +155,7 @@ async function renderLocalizedReport(
       ? (JSON.parse(audit.analyses_json as string) as AgentAnalysis[])
       : [],
     date: ((audit.completed_at as string) || new Date().toISOString()).split('T')[0],
+    pdfUrl: `/api/v1/audit/${auditId}/pdf?lang=${normalizedLang}`,
   };
 
   const html = await translateAndRender(input, lang, llm);
@@ -359,6 +362,49 @@ async function main() {
     }
   });
 
+  // Download report as PDF (cached in DB by auditId+lang)
+  app.get('/api/v1/audit/:id/pdf', async (req, res) => {
+    const audit = getAudit(req.params.id);
+    if (!audit) {
+      return res.status(404).json({ error: 'Audit not found', code: 'NOT_FOUND' });
+    }
+    if (audit.status !== 'completed') {
+      return res.status(202).json({ error: 'Audit still in progress', code: 'AUDIT_IN_PROGRESS', status: audit.status });
+    }
+    if (!isEmailVerified(req.params.id)) {
+      return res.status(403).json({ error: 'Email verification required', code: 'EMAIL_NOT_VERIFIED' });
+    }
+
+    const lang = (req.query.lang as string) || parseAcceptLanguage(req.headers['accept-language']);
+    const normalizedLang = normalizeLangCode(lang);
+    const filename = pdfFilename(audit.url as string, normalizedLang);
+
+    // Tier 1: persistent DB cache.
+    const cached = getStoredPdf(req.params.id, normalizedLang);
+    if (cached) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', cached.length);
+      return res.send(cached);
+    }
+
+    // Generate fresh from the localised HTML.
+    try {
+      const html = await renderLocalizedReport(audit, lang, groq);
+      const pdf = await generateReportPdf(html);
+      storePdf(req.params.id, normalizedLang, pdf);
+      saveDatabase(DB_PATH);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdf.length);
+      res.send(pdf);
+    } catch (err) {
+      console.error(`[PDF] Generation failed for audit ${req.params.id}/${normalizedLang}:`, err);
+      res.status(500).json({ error: 'Failed to generate PDF', code: 'PDF_GENERATION_ERROR' });
+    }
+  });
+
   // Health check
   app.get('/api/v1/health', (_req, res) => {
     res.json({ status: 'ok', version: '0.1.0' });
@@ -368,24 +414,42 @@ async function main() {
   // Supports ?lang=fr to test translations, or falls back to Accept-Language.
   app.get('/preview', async (req, res) => {
     const lang = (req.query.lang as string) || parseAcceptLanguage(req.headers['accept-language']);
-    const cacheKey = `preview|${normalizeLangCode(lang)}`;
+    const normalizedLang = normalizeLangCode(lang);
+    const cacheKey = `preview|${normalizedLang}`;
     const cached = getCachedReport(cacheKey);
 
     let html: string;
     if (cached) {
       html = cached;
     } else {
+      const mockWithPdf = { ...buildMockReportInput(), pdfUrl: `/preview/pdf?lang=${normalizedLang}` };
       try {
-        html = await translateAndRender(buildMockReportInput(), lang, groq);
+        html = await translateAndRender(mockWithPdf, lang, groq);
       } catch (err) {
         console.error(`[Preview] Translation failed for lang=${lang}:`, err);
-        html = generateReportHtml({ ...buildMockReportInput(), lang: normalizeLangCode(lang) });
+        html = generateReportHtml({ ...mockWithPdf, lang: normalizedLang });
       }
       setCachedReport(cacheKey, html);
     }
 
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
+  });
+
+  // Preview PDF — same mock data, regenerated each time (no cache, dev only).
+  app.get('/preview/pdf', async (req, res) => {
+    const lang = (req.query.lang as string) || parseAcceptLanguage(req.headers['accept-language']);
+    try {
+      const html = await translateAndRender(buildMockReportInput(), lang, groq);
+      const pdf = await generateReportPdf(html);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${pdfFilename('https://example.com', normalizeLangCode(lang))}"`);
+      res.setHeader('Content-Length', pdf.length);
+      res.send(pdf);
+    } catch (err) {
+      console.error(`[Preview PDF] Generation failed:`, err);
+      res.status(500).json({ error: 'Failed to generate preview PDF', code: 'PDF_GENERATION_ERROR' });
+    }
   });
 
   // Start server
@@ -441,6 +505,7 @@ async function runAudit(
     analyses: pipelineResult.analyses,
     date: new Date().toISOString().split('T')[0],
     lang: 'es',
+    pdfUrl: `/api/v1/audit/${auditId}/pdf?lang=es`,
   });
 
   // Step 4: Save

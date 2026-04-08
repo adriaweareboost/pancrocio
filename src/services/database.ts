@@ -69,6 +69,17 @@ export async function initDatabase(dbPath: string): Promise<Database> {
     )
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS audit_pdfs (
+      audit_id TEXT NOT NULL,
+      lang TEXT NOT NULL,
+      pdf BLOB NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (audit_id, lang),
+      FOREIGN KEY (audit_id) REFERENCES audits(id) ON DELETE CASCADE
+    )
+  `);
+
   saveDatabase(dbPath);
   return db;
 }
@@ -214,6 +225,7 @@ export function deleteAuditByUrl(normalizedUrl: string): boolean {
   const auditId = result[0].values[0][0] as string;
   const leadId = result[0].values[0][1] as string;
 
+  db.run(`DELETE FROM audit_pdfs WHERE audit_id = ?`, [auditId]);
   db.run(`DELETE FROM audit_translations WHERE audit_id = ?`, [auditId]);
   db.run(`DELETE FROM audits WHERE id = ?`, [auditId]);
   db.run(`DELETE FROM leads WHERE id = ?`, [leadId]);
@@ -235,5 +247,25 @@ export function storeTranslation(auditId: string, lang: string, html: string): v
   db.run(
     `INSERT OR REPLACE INTO audit_translations (audit_id, lang, html, created_at) VALUES (?, ?, ?, ?)`,
     [auditId, lang, html, new Date().toISOString()],
+  );
+}
+
+// ─── PDF cache (persistent) ───
+
+export function getStoredPdf(auditId: string, lang: string): Buffer | null {
+  const result = db.exec(
+    `SELECT pdf FROM audit_pdfs WHERE audit_id = ? AND lang = ?`,
+    [auditId, lang],
+  );
+  if (result.length === 0 || result[0].values.length === 0) return null;
+  const blob = result[0].values[0][0];
+  if (!blob) return null;
+  return Buffer.from(blob as Uint8Array);
+}
+
+export function storePdf(auditId: string, lang: string, pdf: Buffer): void {
+  db.run(
+    `INSERT OR REPLACE INTO audit_pdfs (audit_id, lang, pdf, created_at) VALUES (?, ?, ?, ?)`,
+    [auditId, lang, pdf, new Date().toISOString()],
   );
 }

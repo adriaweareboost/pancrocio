@@ -119,8 +119,21 @@ img, svg { max-width: 100%; height: auto; }
   display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;
 }
 
+.pdf-download-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(219,80,26,0.4); }
+.pdf-download-btn:focus { outline: 2px solid white; outline-offset: 2px; }
+
+@media (max-width: 600px) {
+  .pdf-download-btn {
+    position: static !important;
+    display: inline-flex !important;
+    margin: 12px auto 0 !important;
+    font-size: 12px !important;
+    padding: 8px 14px !important;
+  }
+}
+
 @media print {
   body { background: white; }
-  .sidebar-lead, .mobile-bubble, .mobile-lead-popup, .mobile-overlay { display: none !important; }
+  .sidebar-lead, .mobile-bubble, .mobile-lead-popup, .mobile-overlay, .pdf-download-btn { display: none !important; }
   .page-wrapper { max-width: 800px; }
 }

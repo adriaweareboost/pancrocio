@@ -11,6 +11,11 @@ export async function closeBrowser(): Promise<void> {
   if (browser) await browser.close();
 }
 
+export async function getBrowser(): Promise<Browser> {
+  if (!browser) await initBrowser();
+  return browser!;
+}
+
 export async function scrapeUrl(url: string): Promise<ScrapingResult> {
   if (!browser) await initBrowser();
 

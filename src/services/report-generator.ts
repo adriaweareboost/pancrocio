@@ -55,6 +55,7 @@ export interface ReportUiStrings {
   catTrustSignals: string;
   catMobileExperience: string;
   catPerformance: string;
+  downloadPdfButton: string;
 }
 
 export const DEFAULT_UI_STRINGS: ReportUiStrings = {
@@ -109,6 +110,7 @@ export const DEFAULT_UI_STRINGS: ReportUiStrings = {
   catTrustSignals: 'Senales de Confianza',
   catMobileExperience: 'Experiencia Movil',
   catPerformance: 'Rendimiento',
+  downloadPdfButton: 'Descargar PDF',
 };
 
 /** Map a category key to its translated label using a uiStrings object. */
@@ -136,6 +138,8 @@ interface ReportInput {
   lang?: string;
   /** Public origin for canonical/OG URLs (e.g. "https://pancrocio.up.railway.app"). */
   siteOrigin?: string;
+  /** If set, renders a "Download PDF" button in the header pointing to this URL. */
+  pdfUrl?: string;
 }
 
 /** Maps short ISO codes to BCP 47 locales used in og:locale. */
@@ -394,7 +398,11 @@ export function generateReportHtml(input: ReportInput): string {
 </head>
 <body>
   <!-- Site header -->
-  <header class="report-header" role="banner" style="background:#070F2D;color:white;padding:40px 20px 48px;text-align:center;margin-bottom:0">
+  <header class="report-header" role="banner" style="background:#070F2D;color:white;padding:40px 20px 48px;text-align:center;margin-bottom:0;position:relative">
+    ${input.pdfUrl ? `<a href="${escapeHtml(input.pdfUrl)}" download class="pdf-download-btn" aria-label="${escapeHtml(ui.downloadPdfButton)}" style="position:absolute;top:20px;right:20px;display:inline-flex;align-items:center;gap:8px;padding:10px 18px;background:linear-gradient(90deg,#dd974b,#db501a);color:white;text-decoration:none;border-radius:100px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:13px;box-shadow:0 4px 16px rgba(219,80,26,0.3);transition:transform 0.15s,box-shadow 0.2s">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      ${escapeHtml(ui.downloadPdfButton)}
+    </a>` : ''}
     <div style="max-width:800px;margin:0 auto">
       <div aria-hidden="true" style="margin-bottom:12px">${PANCROCIO_SVG}</div>
       <h1 style="font-size:32px;font-weight:800;margin-bottom:6px;letter-spacing:-0.5px">Pan<span style="color:#EC5F29">CRO</span>cio <span style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">${escapeHtml(ui.reportSubtitle)}</span></h1>
