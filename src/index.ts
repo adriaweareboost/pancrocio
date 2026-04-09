@@ -411,14 +411,11 @@ async function main() {
       res.setHeader('Content-Type', 'text/html');
       res.send(reportHtml);
     } else {
-      // Inject localised sticky verify bar into the report
-      const verifyWidget = await getLocalizedVerifyGate(lang, groq);
-      const withGate = reportHtml
-        .replace('<body>', '<body><div class="report-blur-gate">' + verifyWidget)
-        .replace('</body>', '</div></body>');
-
+      // Serve a clean verification page instead of blurred overlay
+      const auditId = req.params.id;
+      const verifyPageHtml = buildVerifyPage(auditId, audit.url as string, audit.global_score as number);
       res.setHeader('Content-Type', 'text/html');
-      res.send(withGate);
+      res.send(verifyPageHtml);
     }
   });
 
@@ -648,6 +645,86 @@ function buildMockReportInput() {
       ],
     })),
   };
+}
+
+// ─── Verify page (standalone, replaces blur-gate) ───
+function buildVerifyPage(auditId: string, url: string, score: number | null): string {
+  const scoreDisplay = score !== null ? `<div style="margin-top:16px"><span style="font-size:48px;font-weight:800;color:#EC5F29">${score}</span><span style="font-size:18px;color:#9ca3af">/100</span></div>` : '';
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Verificar Email — PanCROcio</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Open Sans', -apple-system, sans-serif; background: #f8f9fb; color: #46495C; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+    h1, h2 { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .verify-card { background: white; border-radius: 20px; padding: 40px 32px; box-shadow: 0 4px 24px rgba(7,15,45,0.10); max-width: 440px; width: 100%; text-align: center; }
+    .logo { margin-bottom: 16px; }
+    .url { font-size: 13px; color: #9ca3af; word-break: break-all; margin-top: 8px; }
+    .subtitle { font-size: 15px; color: #46495C; margin: 20px 0 24px; line-height: 1.5; }
+    .code-input { width: 200px; padding: 14px; border: 2px solid #e2e4ea; border-radius: 12px; font-size: 28px; text-align: center; letter-spacing: 8px; font-weight: 800; color: #070F2D; outline: none; font-family: 'Plus Jakarta Sans', monospace; }
+    .code-input:focus { border-color: #EC5F29; box-shadow: 0 0 0 3px rgba(236,95,41,0.12); }
+    .code-input::placeholder { color: #d1d5db; letter-spacing: 4px; font-weight: 400; }
+    .submit-btn { display: block; width: 100%; max-width: 200px; margin: 20px auto 0; padding: 14px; background: linear-gradient(90deg, #dd974b, #db501a); color: white; border: none; border-radius: 100px; font-size: 16px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; transition: transform 0.15s, box-shadow 0.2s; }
+    .submit-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(219,80,26,0.35); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .error { color: #dc2626; font-size: 13px; margin-top: 12px; display: none; }
+    .resend { margin-top: 16px; font-size: 13px; color: #9ca3af; }
+    .resend a { color: #EC5F29; cursor: pointer; text-decoration: underline; }
+    .footer { margin-top: 24px; font-size: 12px; color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="verify-card">
+    <div class="logo"><img src="/pancrocio.svg" alt="PanCROcio" width="80" height="96"></div>
+    <h1 style="font-size:24px;color:#070F2D">¡Tu informe está listo!</h1>
+    <p class="url">${url}</p>
+    ${scoreDisplay}
+    <p class="subtitle">Introduce el código de 6 dígitos que te hemos enviado por email para desbloquear tu informe.</p>
+    <input type="text" id="codeInput" class="code-input" maxlength="6" placeholder="------" autocomplete="off" inputmode="numeric" autofocus>
+    <button id="verifyBtn" class="submit-btn" onclick="verify()">Desbloquear informe</button>
+    <div class="error" id="errorMsg">Código incorrecto. Inténtalo de nuevo.</div>
+    <div class="resend">¿No lo recibes? <a onclick="resend()">Reenviar código</a></div>
+    <div class="resend" id="resentMsg" style="display:none;color:#22c55e">¡Código reenviado!</div>
+  </div>
+  <div class="footer">PanCROcio &middot; Powered by <strong style="color:#070F2D">Boost</strong></div>
+  <script>
+    var auditId = '${auditId}';
+    function verify() {
+      var code = document.getElementById('codeInput').value.trim();
+      if (code.length !== 6) return;
+      var btn = document.getElementById('verifyBtn');
+      btn.disabled = true; btn.textContent = 'Verificando...';
+      document.getElementById('errorMsg').style.display = 'none';
+      fetch('/api/v1/audit/' + auditId + '/verify', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({code: code})
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.verified) { location.reload(); }
+        else {
+          document.getElementById('errorMsg').style.display = 'block';
+          btn.disabled = false; btn.textContent = 'Desbloquear informe';
+        }
+      }).catch(function() {
+        btn.disabled = false; btn.textContent = 'Desbloquear informe';
+      });
+    }
+    function resend() {
+      fetch('/api/v1/audit/' + auditId + '/send-code', {method:'POST'});
+      document.getElementById('resentMsg').style.display = 'block';
+      setTimeout(function() { document.getElementById('resentMsg').style.display = 'none'; }, 3000);
+    }
+    document.getElementById('codeInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') verify();
+    });
+  </script>
+</body>
+</html>`;
 }
 
 main().catch(console.error);

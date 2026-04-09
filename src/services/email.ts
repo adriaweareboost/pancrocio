@@ -67,7 +67,7 @@ export async function sendVerifyCodeEmail(to: string, code: string): Promise<boo
     </div>
     <p style="text-align:center;font-size:12px;color:#9ca3af;margin-top:20px">El código expira cuando se usa. Si no solicitaste este código, ignora este email.</p>
   `);
-  return send(to, 'Tu código de verificación PanCROcio', html);
+  return send(to, `Tu código PanCROcio: ${code}`, html);
 }
 
 /** Email 2: Report ready + PDF attachment. */
