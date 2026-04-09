@@ -17,13 +17,13 @@ export interface VerifyGateStrings {
 
 export const DEFAULT_VERIFY_STRINGS: VerifyGateStrings = {
   title: '\u{1F512} Verifica tu email',
-  subtitle: 'Introduce el codigo de 6 digitos enviado a tu email',
+  subtitle: 'Introduce el código de 6 dígitos enviado a tu email',
   unlockButton: 'Desbloquear',
   verifyingButton: 'Verificando...',
-  errorMessage: 'Codigo incorrecto',
+  errorMessage: 'Código incorrecto',
   resendQuestion: 'No lo recibes?',
   resendLink: 'Reenviar',
-  resentConfirmation: 'Codigo reenviado!',
+  resentConfirmation: '¡Código reenviado!',
 };
 
 /** Returns the HTML+CSS+JS markup for the verify gate, localised to `strings`. */
