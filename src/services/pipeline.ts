@@ -72,7 +72,7 @@ export async function runPipeline(
     (async () => {
       onStatus?.('  → Groq: analyzing copy, UX heuristics...');
       try {
-        const r = await withPipelineTimeout(runGroqConsolidated(scrapingResult.html, url, groq), 'Groq', 30000);
+        const r = await withPipelineTimeout(runGroqConsolidated(scrapingResult.html, url, groq), 'Groq', 60000);
         onStatus?.('  ✓ Groq analysis done');
         return r;
       } catch (err) {
@@ -98,7 +98,7 @@ export async function runPipeline(
     agentName: name,
     category: cat,
     score: fallbackScore,
-    findings: [{ title: 'Analysis unavailable', description: 'Could not complete analysis.', severity: 'info', recommendation: 'Request manual review.' }],
+    findings: [{ title: 'Análisis no disponible', description: 'No se pudo completar el análisis.', severity: 'info', recommendation: 'Solicitar revisión manual.' }],
     executionTimeMs: 0,
   });
 
