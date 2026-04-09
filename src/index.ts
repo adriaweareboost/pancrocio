@@ -12,6 +12,7 @@ import { runPipeline } from './services/pipeline.js';
 import { generateReportHtml, DEFAULT_UI_STRINGS } from './services/report-generator.js';
 import { buildVerifyGate, DEFAULT_VERIFY_STRINGS } from './services/verify-gate.js';
 import { generateReportPdf, pdfFilename } from './services/pdf.js';
+import { initEmail, sendVerifyCodeEmail, sendReportEmail, sendLeadNotification } from './services/email.js';
 import { parseAcceptLanguage, shouldTranslate, normalizeLangCode, translateReportData, translateUiStrings, translateVerifyStrings } from './agents/translator.js';
 import type { LLMProvider, AgentAnalysis, QuickWin, Mockup, CategoryScores } from './models/interfaces.js';
 import { normalizeUrl, isValidUrl, isValidEmail } from './utils/normalize-url.js';
@@ -222,6 +223,9 @@ async function main() {
   const gemini = createGeminiProvider(geminiKey);
   const groq = createGroqProvider(groqKey);
 
+  // Init email service (reads RESEND_API_KEY from env; falls back to console.log)
+  initEmail();
+
   // Init browser
   console.log('Starting browser...');
   await initBrowser();
@@ -256,8 +260,10 @@ async function main() {
     setVerifyCode(leadId, verifyCode);
     saveDatabase(DB_PATH);
 
-    // Log code (in production this would be sent via email)
+    // Send verification code via email (falls back to console.log in dev)
     console.log(`[Verify] Audit ${auditId} — email: ${email} — code: ${verifyCode}`);
+    sendVerifyCodeEmail(email, verifyCode).catch(() => {});
+    sendLeadNotification(email, url, undefined, auditId).catch(() => {});
 
     cleanupProgress();
     cleanupReportCache();
@@ -319,11 +325,12 @@ async function main() {
       setVerifyCode(leadId, newCode);
       saveDatabase(DB_PATH);
       console.log(`[Verify] Re-sent code for ${req.params.id} — email: ${email} — code: ${newCode}`);
+      if (email) sendVerifyCodeEmail(email, newCode).catch(() => {});
     }
     res.json({ ok: true, message: 'Verification code sent to your email' });
   });
 
-  // Verify email code
+  // Verify email code — on success, send the report email if audit is completed.
   app.post('/api/v1/audit/:id/verify', (req, res) => {
     const { code } = req.body;
     if (!code) {
@@ -335,6 +342,36 @@ async function main() {
     }
     saveDatabase(DB_PATH);
     res.json({ ok: true, verified: true });
+
+    // Fire-and-forget: send the report email if audit is already completed.
+    const siteOrigin = (process.env.SITE_ORIGIN || 'https://pancrocio-production.up.railway.app').replace(/\/$/, '');
+    const auditId = req.params.id;
+    (async () => {
+      const audit = getAudit(auditId);
+      if (!audit || audit.status !== 'completed') return; // audit still running, will send later
+      const email = getLeadEmail(auditId);
+      if (!email) return;
+      const lang = 'es';
+      const reportUrl = `${siteOrigin}/api/v1/audit/${auditId}/report`;
+      // Try to generate PDF for attachment
+      let pdfBuf: Buffer | undefined;
+      let pdfName: string | undefined;
+      try {
+        pdfBuf = getStoredPdf(auditId, lang) || undefined;
+        if (!pdfBuf) {
+          const html = audit.report_html as string;
+          pdfBuf = await generateReportPdf(html);
+          storePdf(auditId, lang, pdfBuf);
+          saveDatabase(DB_PATH);
+        }
+        pdfName = pdfFilename(audit.url as string, lang);
+      } catch (err) {
+        console.warn(`[Email] PDF generation failed for report email:`, (err as Error).message);
+      }
+      await sendReportEmail(email, audit.url as string, audit.global_score as number, reportUrl, pdfBuf, pdfName);
+      // Update internal notification with score
+      await sendLeadNotification(email, audit.url as string, audit.global_score as number, auditId);
+    })().catch(err => console.error('[Email] Report email failed:', err));
   });
 
   // Check verification status
@@ -540,6 +577,25 @@ async function runAudit(
 
   addMessage('Audit complete!');
   progress.status = 'completed';
+
+  // If user already verified email before audit finished, send report email now.
+  if (isEmailVerified(auditId)) {
+    const email = getLeadEmail(auditId);
+    if (email) {
+      const siteOrigin = (process.env.SITE_ORIGIN || 'https://pancrocio-production.up.railway.app').replace(/\/$/, '');
+      const reportUrl = `${siteOrigin}/api/v1/audit/${auditId}/report`;
+      let pdfBuf: Buffer | undefined;
+      let pdfName: string | undefined;
+      try {
+        pdfBuf = await generateReportPdf(reportHtml);
+        storePdf(auditId, 'es', pdfBuf);
+        saveDatabase(DB_PATH);
+        pdfName = pdfFilename(url, 'es');
+      } catch { /* PDF optional */ }
+      sendReportEmail(email, url, pipelineResult.globalScore, reportUrl, pdfBuf, pdfName).catch(() => {});
+      sendLeadNotification(email, url, pipelineResult.globalScore, auditId).catch(() => {});
+    }
+  }
 }
 
 // ─── Mock data for /preview endpoint ───
