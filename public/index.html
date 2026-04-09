@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PanCROcio — Auditoria CRO Gratuita con IA | Boost</title>
-  <meta name="description" content="PanCROcio analiza tu web con inteligencia artificial y te da un informe CRO gratuito en minutos. Mejora tu tasa de conversion con quick wins accionables.">
-  <meta name="keywords" content="CRO, conversion rate optimization, auditoria web, analisis CRO, optimizacion conversion, UX, PanCROcio, Boost">
+  <title>PanCROcio — Auditoría CRO Gratuita con IA | Boost</title>
+  <meta name="description" content="PanCROcio analiza tu web con inteligencia artificial y te da un informe CRO gratuito en minutos. Mejora tu tasa de conversión con quick wins accionables.">
+  <meta name="keywords" content="CRO, conversion rate optimization, auditoría web, análisis CRO, optimización conversión, UX, PanCROcio, Boost">
   <meta name="author" content="Boost - weareboost.online">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://pancrocio.com">
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="PanCROcio — Auditoria CRO Gratuita con IA">
-  <meta property="og:description" content="Analiza tu web gratis con IA. Informe CRO completo con quick wins, wireframes y puntuaciones por categoria en menos de 2 minutos.">
+  <meta property="og:title" content="PanCROcio — Auditoría CRO Gratuita con IA">
+  <meta property="og:description" content="Analiza tu web gratis con IA. Informe CRO completo con quick wins, wireframes y puntuaciones por categoría en menos de 2 minutos.">
   <meta property="og:url" content="https://pancrocio.com">
   <meta property="og:site_name" content="PanCROcio">
   <meta property="og:image" content="https://pancrocio.com/pancrocio.svg">
@@ -21,7 +21,7 @@
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="PanCROcio — Auditoria CRO Gratuita con IA">
+  <meta name="twitter:title" content="PanCROcio — Auditoría CRO Gratuita con IA">
   <meta name="twitter:description" content="Tu analista CRO con IA. Informe gratuito con quick wins accionables en menos de 2 minutos.">
   <meta name="twitter:image" content="https://pancrocio.com/pancrocio.svg">
 
@@ -35,7 +35,7 @@
     "@context": "https://schema.org",
     "@type": "WebApplication",
     "name": "PanCROcio",
-    "description": "Herramienta de auditoria CRO gratuita impulsada por inteligencia artificial. Analiza tu web y recibe un informe con mejoras accionables.",
+    "description": "Herramienta de auditoría CRO gratuita impulsada por inteligencia artificial. Analiza tu web y recibe un informe con mejoras accionables.",
     "url": "https://pancrocio.com",
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
@@ -72,23 +72,45 @@
       color: white;
       padding: 80px 20px 60px;
       text-align: center;
+      transition: padding 0.5s ease;
     }
+    .hero.compact {
+      padding: 28px 20px 40px;
+    }
+    .hero.compact img { width: 60px; height: 72px; }
+    .hero.compact h1 { font-size: 28px; margin-bottom: 6px; }
+    .hero.compact p { font-size: 14px; }
     .hero h1 {
       font-family: 'Plus Jakarta Sans', sans-serif;
       font-size: 42px;
       font-weight: 800;
       margin-bottom: 12px;
       letter-spacing: -0.5px;
+      transition: font-size 0.5s ease;
     }
     .hero h1 span { color: #EC5F29; }
-    .hero p { font-size: 18px; opacity: 0.8; max-width: 560px; margin: 0 auto; line-height: 1.6; }
+    .hero p { font-size: 18px; opacity: 0.8; max-width: 560px; margin: 0 auto; line-height: 1.6; transition: font-size 0.5s ease; }
+    .hero img { transition: width 0.5s ease, height 0.5s ease; }
 
+    .landing-layout {
+      max-width: 1100px;
+      margin: -30px auto 40px;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 1fr minmax(340px, 560px) 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    .features-left, .features-right {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding-top: 10px;
+    }
     .card {
       background: white;
       border-radius: 16px;
       box-shadow: 0 4px 24px rgba(7,15,45,0.10);
-      max-width: 560px;
-      margin: -30px auto 40px;
       padding: 32px;
       position: relative;
     }
@@ -226,36 +248,48 @@
       min-height: 800px;
     }
 
-    .features {
-      max-width: 800px;
-      margin: 0 auto 60px;
-      padding: 0 20px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-    }
     .feature {
       background: white;
       border-radius: 16px;
-      padding: 28px 24px;
+      padding: 24px 20px;
       text-align: center;
       box-shadow: 0 2px 8px rgba(7,15,45,0.06);
       transition: transform 0.2s;
     }
     .feature:hover { transform: translateY(-3px); }
     .feature-icon {
-      width: 52px;
-      height: 52px;
-      margin: 0 auto 14px;
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 10px;
       background: linear-gradient(135deg, #fff7ed, #fef3e2);
-      border-radius: 14px;
+      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 24px;
+      font-size: 22px;
     }
-    .feature h3 { font-size: 16px; font-weight: 700; color: #070F2D; margin-bottom: 6px; font-family: 'Plus Jakarta Sans', sans-serif; }
-    .feature p { font-size: 13px; color: #46495C; line-height: 1.5; }
+    .feature h3 { font-size: 14px; font-weight: 700; color: #070F2D; margin-bottom: 4px; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .feature p { font-size: 12px; color: #46495C; line-height: 1.4; }
+
+    @media (max-width: 860px) {
+      .landing-layout {
+        grid-template-columns: 1fr;
+        max-width: 560px;
+      }
+      .features-left, .features-right {
+        flex-direction: row;
+        gap: 12px;
+      }
+      .features-left { order: 2; }
+      .card { order: 1; }
+      .features-right { order: 3; }
+      .feature { flex: 1; min-width: 0; }
+    }
+    @media (max-width: 500px) {
+      .features-left, .features-right {
+        flex-direction: column;
+      }
+    }
 
     .footer {
       text-align: center;
@@ -273,9 +307,25 @@
       <img src="/pancrocio.svg" alt="PanCROcio" width="120" height="144" style="filter:drop-shadow(0 4px 12px rgba(0,0,0,0.3))">
     </div>
     <h1>Pan<span>CRO</span>cio</h1>
-    <p>Tu analista CRO con IA. Consigue una auditoria CRO gratuita de tu web en minutos. Descubre quick wins para mejorar tu conversion.</p>
+    <p>Tu analista CRO con IA. Consigue una auditoría CRO gratuita de tu web en minutos. Descubre quick wins para mejorar tu conversión.</p>
   </div>
 
+  <div class="landing-layout">
+  <!-- Left features -->
+  <div class="features-left">
+    <div class="feature">
+      <div class="feature-icon">&#x1f50d;</div>
+      <h3>Análisis Visual</h3>
+      <p>IA analiza tu layout, CTAs y jerarquía visual</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">&#x1f4dd;</div>
+      <h3>Revisión de Copy</h3>
+      <p>Titulares, propuesta de valor y efectividad de CTAs</p>
+    </div>
+  </div>
+
+  <!-- Center form card -->
   <div class="card">
     <div class="error-msg" id="error"></div>
 
@@ -319,31 +369,23 @@
     <iframe id="reportIframe"></iframe>
   </div>
 
-  <div class="features">
-    <div class="feature">
-      <div class="feature-icon">&#x1f50d;</div>
-      <h3>Analisis Visual</h3>
-      <p>IA analiza tu layout, CTAs y jerarquia visual</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">&#x1f4dd;</div>
-      <h3>Revision de Copy</h3>
-      <p>Titulares, propuesta de valor y efectividad de CTAs</p>
-    </div>
+  <!-- Right features -->
+  <div class="features-right">
     <div class="feature">
       <div class="feature-icon">&#x1f4f1;</div>
       <h3>Check Mobile</h3>
-      <p>Touch targets, diseno responsive y UX movil</p>
+      <p>Touch targets, diseño responsive y UX móvil</p>
     </div>
     <div class="feature">
       <div class="feature-icon">&#x1f6e1;</div>
       <h3>Trust Signals</h3>
-      <p>Social proof, garantias y elementos de credibilidad</p>
+      <p>Social proof, garantías y elementos de credibilidad</p>
     </div>
   </div>
+  </div> <!-- /landing-layout -->
 
   <div class="footer">
-    Powered by <a href="https://www.weareboost.online" target="_blank" rel="noopener">Boost</a> &middot; PanCROcio &mdash; Optimizacion de conversion con IA
+    Powered by <a href="https://www.weareboost.online" target="_blank" rel="noopener">Boost</a> &middot; PanCROcio &mdash; Optimización de conversión con IA
   </div>
 
   <script>
@@ -443,7 +485,7 @@
       if (!email || !url) return showError('Rellena ambos campos.');
 
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Iniciando auditoria...';
+      submitBtn.textContent = 'Iniciando auditoría...';
 
       try {
         const res = await fetch('/api/v1/audit', {
@@ -463,11 +505,12 @@
 
         progressSection.style.display = 'block';
         submitBtn.textContent = 'Analizando...';
+        document.querySelector('.hero').classList.add('compact');
         startMotivationalLoop();
         pollAudit(data.auditId);
 
       } catch (err) {
-        showError('Error de conexion. El servidor no responde.');
+        showError('Error de conexión. El servidor no responde.');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Analizar mi web';
       }
@@ -491,7 +534,7 @@
           else if (data.status === 'failed') {
             clearInterval(interval);
             stopMotivationalLoop();
-            showError('La auditoria ha fallado. Intentalo de nuevo.');
+            showError('La auditoría ha fallado. Inténtalo de nuevo.');
             submitBtn.disabled = false;
             submitBtn.textContent = 'Analizar mi web';
             return;
@@ -514,8 +557,8 @@
             motivationalCard.style.background = 'linear-gradient(135deg, #f0fdf4, #ecfdf5)';
             motivationalCard.style.borderColor = '#86efac';
             motivationalIcon.innerHTML = '&#x1F389;';
-            motivationalTitle.textContent = 'Tu informe CRO esta listo!';
-            motivationalText.textContent = 'Baja para ver tu informe personalizado de optimizacion de conversion con quick wins accionables.';
+            motivationalTitle.textContent = '¡Tu informe CRO está listo!';
+            motivationalText.textContent = 'Baja para ver tu informe personalizado de optimización de conversión con quick wins accionables.';
 
             const elapsed = Math.floor((Date.now() - startTime) / 1000);
             statTime.innerHTML = `<strong>${Math.floor(elapsed / 60)}m ${elapsed % 60}s</strong> total`;
