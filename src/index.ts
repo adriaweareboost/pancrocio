@@ -552,8 +552,25 @@ async function runAudit(
 
   const pipelineResult = await runPipeline(scrapingResult, url, gemini, groq, addMessage);
 
-  // Step 3: Generate report
-  addMessage('Generating report...');
+  // Step 3: Translate LLM results to Spanish (LLM responds in English for reliability)
+  addMessage('Traduciendo resultados...');
+  let { quickWins, mockups, analyses } = pipelineResult;
+  try {
+    const translated = await translateReportData(
+      { quickWins, mockups, analyses },
+      'es',
+      groq,
+      true, // force: LLM responds in English, translate to Spanish
+    );
+    quickWins = translated.quickWins;
+    mockups = translated.mockups;
+    analyses = translated.analyses;
+  } catch (err) {
+    console.warn('[Audit] Translation to Spanish failed, using English results:', (err as Error).message);
+  }
+
+  // Step 4: Generate report
+  addMessage('Generando informe...');
   updateAuditStatus(auditId, 'generating_report');
   saveDatabase(DB_PATH);
 
@@ -561,9 +578,9 @@ async function runAudit(
     url,
     globalScore: pipelineResult.globalScore,
     scores: pipelineResult.scores,
-    quickWins: pipelineResult.quickWins,
-    mockups: pipelineResult.mockups,
-    analyses: pipelineResult.analyses,
+    quickWins,
+    mockups,
+    analyses,
     date: new Date().toISOString().split('T')[0],
     lang: 'es',
     pdfUrl: `/api/v1/audit/${auditId}/pdf?lang=es`,
@@ -574,9 +591,9 @@ async function runAudit(
     auditId,
     pipelineResult.globalScore,
     JSON.stringify(pipelineResult.scores),
-    JSON.stringify(pipelineResult.quickWins),
-    JSON.stringify(pipelineResult.mockups),
-    JSON.stringify(pipelineResult.analyses),
+    JSON.stringify(quickWins),
+    JSON.stringify(mockups),
+    JSON.stringify(analyses),
     reportHtml,
   );
   saveDatabase(DB_PATH);

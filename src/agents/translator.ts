@@ -106,13 +106,18 @@ ${JSON.stringify(strings)}`;
   }
 }
 
-/** Translates report data fields (quickwins, mockups, findings). */
+/**
+ * Translates report data fields (quickwins, mockups, findings).
+ * Pass `force: true` to translate even when targetLang is Spanish
+ * (used to translate English LLM outputs to Spanish after pipeline).
+ */
 export async function translateReportData(
   data: TranslatableReportData,
   targetLang: string,
   llm: LLMProvider,
+  force = false,
 ): Promise<TranslatableReportData> {
-  if (!shouldTranslate(targetLang)) return data;
+  if (!force && !shouldTranslate(targetLang)) return data;
 
   // Flatten all translatable strings into a single array, remembering positions.
   const strings: string[] = [];

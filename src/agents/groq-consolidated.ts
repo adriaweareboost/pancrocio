@@ -4,8 +4,6 @@ import { buildAnalysis } from '../utils/score.js';
 
 const PROMPT = `You are a world-class CRO (Conversion Rate Optimization) expert. Analyze this website's text content and provide a comprehensive audit covering TWO areas.
 
-IMPORTANT: Write all finding titles, descriptions, and recommendations in the SAME LANGUAGE as the website content you are analyzing. If the website is in Spanish, respond in Spanish. If in English, respond in English. Etc.
-
 ## AREA 1: Copy & Messaging (category: copyMessaging)
 Evaluate:
 - Headline clarity: benefit-driven and compelling?

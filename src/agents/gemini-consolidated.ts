@@ -5,8 +5,6 @@ import { safeParseLLMJson } from '../utils/llm.js';
 
 const PROMPT = `You are a world-class CRO (Conversion Rate Optimization) expert. Analyze this website screenshot and provide a comprehensive audit covering THREE areas.
 
-IMPORTANT: Write all finding titles, descriptions, and recommendations in the SAME LANGUAGE as the website content you are analyzing. If the website is in Spanish, respond in Spanish. If in English, respond in English. If in French, respond in French. Etc.
-
 ## AREA 1: Visual Hierarchy (category: visualHierarchy)
 Evaluate:
 - Clear visual hierarchy (headings, subheadings, body)
