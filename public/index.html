@@ -242,17 +242,6 @@
       text-align: center;
     }
 
-    .report-frame {
-      display: none;
-      width: 100%;
-      margin: 0 auto 40px;
-      overflow: hidden;
-    }
-    .report-frame iframe {
-      width: 100%;
-      border: none;
-      min-height: 800px;
-    }
 
     .feature {
       background: white;
@@ -371,9 +360,6 @@
     </div>
   </div>
 
-  <div class="report-frame" id="reportFrame">
-    <iframe id="reportIframe"></iframe>
-  </div>
 
   <!-- Right features -->
   <div class="features-right">
@@ -401,8 +387,6 @@
     const progressSection = document.getElementById('progressSection');
     const progressFill = document.getElementById('progressFill');
     const progressMessages = document.getElementById('progressMessages');
-    const reportFrame = document.getElementById('reportFrame');
-    const reportIframe = document.getElementById('reportIframe');
     const motivationalCard = document.getElementById('motivationalCard');
     const motivationalIcon = document.getElementById('motivationalIcon');
     const motivationalTitle = document.getElementById('motivationalTitle');
@@ -576,23 +560,9 @@
             submitBtn.textContent = 'Informe listo!';
             submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
 
+            // Redirect to the full report page (works perfectly on mobile)
             setTimeout(() => {
-              reportFrame.style.display = 'block';
-              reportIframe.src = `/api/v1/audit/${auditId}/report`;
-              reportFrame.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-              reportIframe.onload = () => {
-                try {
-                  var resizeIframe = () => {
-                    reportIframe.style.height = reportIframe.contentWindow.document.body.scrollHeight + 40 + 'px';
-                  };
-                  resizeIframe();
-                  // Re-check after images/fonts load and on resize
-                  setTimeout(resizeIframe, 500);
-                  setTimeout(resizeIframe, 1500);
-                  window.addEventListener('resize', resizeIframe);
-                } catch(e) {}
-              };
+              window.location.href = `/api/v1/audit/${auditId}/report`;
             }, 1500);
           }
         } catch (err) {}
