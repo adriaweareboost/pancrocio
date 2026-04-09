@@ -364,10 +364,10 @@
 
       <div class="elapsed-timer" id="elapsedTimer"></div>
 
-      <details open style="margin-top:12px">
-        <summary style="font-size:12px;color:#9ca3af;cursor:pointer">Detalles técnicos</summary>
+      <div style="margin-top:12px">
+        <p style="font-size:12px;color:#9ca3af;margin-bottom:8px">Detalles técnicos</p>
         <div class="progress-messages" id="progressMessages"></div>
-      </details>
+      </div>
     </div>
   </div>
 
@@ -516,9 +516,6 @@
         document.querySelector('.features-right').style.display = 'none';
         document.querySelector('.landing-layout').style.gridTemplateColumns = '1fr';
         document.querySelector('.landing-layout').style.maxWidth = '560px';
-        // Force technical details open
-        var detailsEl = progressSection.querySelector('details');
-        if (detailsEl) detailsEl.open = true;
         startMotivationalLoop();
         pollAudit(data.auditId);
 
