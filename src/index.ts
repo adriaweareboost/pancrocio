@@ -24,6 +24,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const PORT = process.env.PORT || 3000;
+const SITE_ORIGIN = (process.env.SITE_ORIGIN || 'https://pancrocio-production.up.railway.app').replace(/\/$/, '');
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'croagent.db');
 
 // In-memory audit status tracking (auto-cleanup after 30 min)
@@ -107,16 +108,16 @@ async function translateAndRender(
   llm: LLMProvider,
 ): Promise<string> {
   const normalized = normalizeLangCode(lang);
-  if (!shouldTranslate(lang)) {
+  if (!shouldTranslate(normalized)) {
     return generateReportHtml({ ...input, lang: normalized });
   }
   const [translatedData, translatedUi] = await Promise.all([
     translateReportData(
       { quickWins: input.quickWins, mockups: input.mockups, analyses: input.analyses },
-      lang,
+      normalized,
       llm,
     ),
-    getCachedUiStrings(lang, llm),
+    getCachedUiStrings(normalized, llm),
   ]);
   return generateReportHtml({
     ...input,
@@ -261,7 +262,11 @@ async function main() {
     saveDatabase(DB_PATH);
 
     // Send verification code via email (falls back to console.log in dev)
-    console.log(`[Verify] Audit ${auditId} — email: ${email} — code: ${verifyCode}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[Verify] Audit ${auditId} — email: ${email} — code: ${verifyCode}`);
+    } else {
+      console.log(`[Verify] Audit ${auditId} — email: ${email} — code sent via email`);
+    }
     sendVerifyCodeEmail(email, verifyCode).catch(() => {});
     sendLeadNotification(email, url, undefined, auditId).catch(() => {});
 
@@ -344,7 +349,7 @@ async function main() {
     res.json({ ok: true, verified: true });
 
     // Fire-and-forget: send the report email if audit is already completed.
-    const siteOrigin = (process.env.SITE_ORIGIN || 'https://pancrocio-production.up.railway.app').replace(/\/$/, '');
+    const siteOrigin = SITE_ORIGIN;
     const auditId = req.params.id;
     (async () => {
       const audit = getAudit(auditId);
@@ -582,7 +587,7 @@ async function runAudit(
   if (isEmailVerified(auditId)) {
     const email = getLeadEmail(auditId);
     if (email) {
-      const siteOrigin = (process.env.SITE_ORIGIN || 'https://pancrocio-production.up.railway.app').replace(/\/$/, '');
+      const siteOrigin = SITE_ORIGIN;
       const reportUrl = `${siteOrigin}/api/v1/audit/${auditId}/report`;
       let pdfBuf: Buffer | undefined;
       let pdfName: string | undefined;

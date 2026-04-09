@@ -2,6 +2,7 @@
 // Falls back to console.log when RESEND_API_KEY is not set (dev mode).
 
 import { Resend } from 'resend';
+import { escapeHtml } from '../utils/html.js';
 
 let resend: Resend | null = null;
 let fromAddress = 'PanCROcio <pancrocio@weareboost.online>';
@@ -66,7 +67,7 @@ export async function sendVerifyCodeEmail(to: string, code: string): Promise<boo
     </div>
     <p style="text-align:center;font-size:12px;color:#9ca3af;margin-top:20px">El código expira cuando se usa. Si no solicitaste este código, ignora este email.</p>
   `);
-  return send(to, `Tu código PanCROcio: ${code}`, html);
+  return send(to, 'Tu código de verificación PanCROcio', html);
 }
 
 /** Email 2: Report ready + PDF attachment. */
@@ -81,13 +82,13 @@ export async function sendReportEmail(
   const scoreColor = globalScore >= 80 ? '#22c55e' : globalScore >= 60 ? '#EC5F29' : globalScore >= 40 ? '#f97316' : '#ef4444';
   const html = emailWrapper(`
     <h2 style="text-align:center;font-size:20px;color:#070F2D;margin:0 0 8px">¡Tu informe CRO está listo!</h2>
-    <p style="text-align:center;font-size:14px;color:#46495C;margin:0 0 24px">Hemos analizado <strong>${url}</strong></p>
+    <p style="text-align:center;font-size:14px;color:#46495C;margin:0 0 24px">Hemos analizado <strong>${escapeHtml(url)}</strong></p>
     <div style="text-align:center;margin-bottom:24px">
       <div style="display:inline-block;background:${scoreColor};color:white;border-radius:50%;width:80px;height:80px;line-height:80px;font-size:28px;font-weight:800">${globalScore}</div>
       <p style="font-size:12px;color:#9ca3af;margin-top:8px">Puntuación global / 100</p>
     </div>
     <div style="text-align:center;margin-bottom:16px">
-      <a href="${reportUrl}" style="display:inline-block;padding:14px 32px;background:linear-gradient(90deg,#dd974b,#db501a);color:white;text-decoration:none;border-radius:100px;font-weight:700;font-size:15px">Ver informe completo</a>
+      <a href="${escapeHtml(reportUrl)}" style="display:inline-block;padding:14px 32px;background:linear-gradient(90deg,#dd974b,#db501a);color:white;text-decoration:none;border-radius:100px;font-weight:700;font-size:15px">Ver informe completo</a>
     </div>
     ${pdfBuffer ? '<p style="text-align:center;font-size:13px;color:#46495C">También encontrarás el informe en PDF adjunto a este email.</p>' : ''}
     <p style="text-align:center;font-size:12px;color:#9ca3af;margin-top:20px">¿Quieres implementar las mejoras? <a href="https://www.weareboost.online">Contáctanos</a></p>
@@ -114,8 +115,8 @@ export async function sendLeadNotification(
   const html = emailWrapper(`
     <h2 style="font-size:18px;color:#070F2D;margin:0 0 12px">Nuevo lead en PanCROcio</h2>
     <table style="width:100%;font-size:14px;border-collapse:collapse">
-      <tr><td style="padding:8px 0;color:#9ca3af;width:80px">Email</td><td style="padding:8px 0;color:#070F2D;font-weight:600">${email}</td></tr>
-      <tr><td style="padding:8px 0;color:#9ca3af">URL</td><td style="padding:8px 0"><a href="${url}">${url}</a></td></tr>
+      <tr><td style="padding:8px 0;color:#9ca3af;width:80px">Email</td><td style="padding:8px 0;color:#070F2D;font-weight:600">${escapeHtml(email)}</td></tr>
+      <tr><td style="padding:8px 0;color:#9ca3af">URL</td><td style="padding:8px 0"><a href="${escapeHtml(url)}">${escapeHtml(url)}</a></td></tr>
       ${globalScore !== undefined ? `<tr><td style="padding:8px 0;color:#9ca3af">Score</td><td style="padding:8px 0;font-weight:700;color:${globalScore >= 60 ? '#22c55e' : '#f97316'}">${globalScore}/100</td></tr>` : ''}
       ${auditId ? `<tr><td style="padding:8px 0;color:#9ca3af">Audit</td><td style="padding:8px 0;font-family:monospace;font-size:12px">${auditId}</td></tr>` : ''}
     </table>

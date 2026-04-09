@@ -18,8 +18,16 @@ export function escapeJsString(str: string): string {
 
 export function sanitizeMockupHtml(html: string): string {
   return html
+    // Remove dangerous tags entirely
+    .replace(/<\s*\/?\s*(script|iframe|embed|object|form|link|meta|base|applet)\b[^>]*>/gi, '')
+    // Remove script content that might have been split
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    // Remove all event handler attributes (onclick, onload, onerror, etc.)
     .replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '')
     .replace(/\bon\w+\s*=\s*[^\s>]*/gi, '')
-    .replace(/javascript\s*:/gi, 'blocked:');
+    // Block dangerous URI schemes in href/src/action
+    .replace(/(?:javascript|vbscript|data)\s*:/gi, 'blocked:')
+    // Remove srcdoc attributes (can embed arbitrary HTML)
+    .replace(/\bsrcdoc\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/\bsrcdoc\s*=\s*[^\s>]*/gi, '');
 }

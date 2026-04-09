@@ -183,8 +183,8 @@ export function setVerifyCode(leadId: string, code: string): void {
 }
 
 export function verifyEmailCode(auditId: string, code: string): boolean {
-  // Master code for testing/demo
-  const isMaster = code === '000000';
+  // Master code only allowed in non-production environments
+  const isMaster = code === '000000' && process.env.NODE_ENV !== 'production';
   const result = db.exec(
     isMaster
       ? `SELECT l.id FROM leads l JOIN audits a ON l.audit_id = a.id WHERE a.id = ?`

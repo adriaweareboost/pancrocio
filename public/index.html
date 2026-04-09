@@ -359,7 +359,7 @@
       <div class="elapsed-timer" id="elapsedTimer"></div>
 
       <details style="margin-top:12px">
-        <summary style="font-size:12px;color:#9ca3af;cursor:pointer">Technical details</summary>
+        <summary style="font-size:12px;color:#9ca3af;cursor:pointer">Detalles técnicos</summary>
         <div class="progress-messages" id="progressMessages"></div>
       </details>
     </div>
@@ -524,7 +524,7 @@
           const data = await res.json();
 
           progressMessages.innerHTML = (data.messages || [])
-            .map(m => `<div>${m}</div>`).join('');
+            .map(m => `<div>${m.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#x27;'}[c]||c))}</div>`).join('');
           progressMessages.scrollTop = progressMessages.scrollHeight;
 
           if (data.status === 'scraping') progress = 15;
