@@ -2,15 +2,6 @@
 
 // ─── Value Objects ───
 
-export interface Email {
-  value: string;
-}
-
-export interface NormalizedUrl {
-  original: string;
-  normalized: string;
-}
-
 export interface Score {
   value: number; // 0-100
   label: 'critical' | 'poor' | 'fair' | 'good' | 'excellent';
@@ -39,7 +30,7 @@ export interface Audit {
   globalScore: number | null;
   quickWins: QuickWin[];
   mockups: Mockup[];
-  report: ReportData | null;
+  reportHtml: string | null;
   createdAt: Date;
   completedAt: Date | null;
 }
@@ -118,45 +109,6 @@ export interface Mockup {
   relatedQuickWin: number; // rank reference
 }
 
-// ─── Report ───
-
-export interface ReportData {
-  audit: Audit;
-  executiveSummary: string;
-  categoryDetails: AgentAnalysis[];
-  generatedAt: Date;
-}
-
-// ─── API ───
-
-export interface AuditRequest {
-  email: string;
-  url: string;
-}
-
-export interface AuditResponse {
-  auditId: string;
-  status: AuditStatus;
-  message: string;
-}
-
-export interface ReportResponse {
-  auditId: string;
-  url: string;
-  globalScore: number;
-  scores: CategoryScores;
-  executiveSummary: string;
-  quickWins: QuickWin[];
-  mockups: Mockup[];
-  categoryDetails: AgentAnalysis[];
-  generatedAt: string;
-}
-
-export interface ErrorResponse {
-  error: string;
-  code: string;
-}
-
 // ─── Agent Contracts ───
 
 export interface CROAgent {
@@ -183,16 +135,3 @@ export interface LLMProvider {
   generateJSON<T>(prompt: string, schema?: string): Promise<T>;
 }
 
-// ─── Repository ───
-
-export interface LeadRepository {
-  create(lead: Omit<Lead, 'id'>): Promise<Lead>;
-  findByEmail(email: string): Promise<Lead[]>;
-}
-
-export interface AuditRepository {
-  create(audit: Omit<Audit, 'id'>): Promise<Audit>;
-  findByNormalizedUrl(normalizedUrl: string): Promise<Audit | null>;
-  findById(id: string): Promise<Audit | null>;
-  update(id: string, data: Partial<Audit>): Promise<Audit>;
-}

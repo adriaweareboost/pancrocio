@@ -531,7 +531,11 @@ async function runAudit(
   gemini: ReturnType<typeof createGeminiProvider>,
   groq: ReturnType<typeof createGroqProvider>,
 ) {
-  const progress = auditProgress.get(auditId)!;
+  let progress = auditProgress.get(auditId);
+  if (!progress) {
+    progress = { status: 'running', messages: [], createdAt: Date.now() };
+    auditProgress.set(auditId, progress);
+  }
   const addMessage = (msg: string) => {
     progress.messages.push(msg);
     progress.status = msg;
@@ -607,7 +611,7 @@ async function runAudit(
 function buildMockReportInput() {
   const mkScore = (value: number) => ({
     value,
-    label: (value >= 80 ? 'excellent' : value >= 65 ? 'good' : value >= 50 ? 'fair' : value >= 35 ? 'poor' : 'critical') as 'critical' | 'poor' | 'fair' | 'good' | 'excellent',
+    label: (value >= 90 ? 'excellent' : value >= 70 ? 'good' : value >= 50 ? 'fair' : value >= 30 ? 'poor' : 'critical') as 'critical' | 'poor' | 'fair' | 'good' | 'excellent',
   });
   return {
     url: 'https://example.com',

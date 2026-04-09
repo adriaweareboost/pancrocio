@@ -1,4 +1,4 @@
-import type { AgentAnalysis, AgentInput, CategoryScores } from '../models/interfaces.js';
+import type { AgentAnalysis, AgentInput } from '../models/interfaces.js';
 import type { LLMProvider } from '../models/interfaces.js';
 import { buildAnalysis } from '../utils/score.js';
 import { safeParseLLMJson } from '../utils/llm.js';

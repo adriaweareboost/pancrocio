@@ -1,4 +1,4 @@
-import type { AgentAnalysis, Finding, CategoryScores } from '../models/interfaces.js';
+import type { AgentAnalysis, Finding } from '../models/interfaces.js';
 import type { LLMProvider } from '../models/interfaces.js';
 import { buildAnalysis } from '../utils/score.js';
 

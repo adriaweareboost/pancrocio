@@ -14,10 +14,11 @@ export function buildAnalysis(
   data: { score: number; findings: Finding[] },
   timeMs: number,
 ): AgentAnalysis {
+  const clampedScore = Math.max(0, Math.min(100, Math.round(data.score)));
   return {
     agentName,
     category,
-    score: { value: data.score, label: scoreToLabel(data.score) },
+    score: { value: clampedScore, label: scoreToLabel(clampedScore) },
     findings: (data.findings || []).map(f => ({
       title: f.title || '',
       description: f.description || '',

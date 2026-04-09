@@ -52,8 +52,7 @@ export async function generateReportPdf(html: string): Promise<Buffer> {
       /<link[^>]*href="\/report\.css[^"]*"[^>]*>/g,
       `<style>${reportCss}\n${PDF_OVERRIDES}</style>`,
     )
-    .replace(/<script[^>]*src="\/report\.js[^"]*"[^>]*><\/script>/g, '')
-    .replace(/<script[^>]*src="\/report\.js[^"]*"\s*\/?\s*><\/script>/g, '');
+    .replace(/<script[^>]*src="\/report\.js[^"]*"[^>]*><\/script>/g, '');
 
   const context = await browser.newContext({
     viewport: { width: 1280, height: 1800 },

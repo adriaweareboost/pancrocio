@@ -90,18 +90,6 @@ export function saveDatabase(dbPath: string): void {
   writeFileSync(dbPath, buffer);
 }
 
-export function getDb(): Database {
-  return db;
-}
-
-export function isUrlAudited(normalizedUrl: string): boolean {
-  const result = db.exec(
-    `SELECT id FROM audits WHERE normalized_url = ? AND status = 'completed'`,
-    [normalizedUrl]
-  );
-  return result.length > 0 && result[0].values.length > 0;
-}
-
 export function createLead(id: string, email: string, url: string): void {
   db.run(
     `INSERT INTO leads (id, email, url, created_at) VALUES (?, ?, ?, ?)`,
@@ -139,15 +127,6 @@ export function completeAudit(
     `UPDATE audits SET status = 'completed', global_score = ?, scores_json = ?, quick_wins_json = ?, mockups_json = ?, analyses_json = ?, report_html = ?, completed_at = ? WHERE id = ?`,
     [globalScore, scoresJson, quickWinsJson, mockupsJson, analysesJson, reportHtml, new Date().toISOString(), id]
   );
-}
-
-export function countAuditsByEmail(email: string): number {
-  const result = db.exec(
-    `SELECT COUNT(*) as count FROM leads l JOIN audits a ON l.audit_id = a.id WHERE l.email = ?`,
-    [email]
-  );
-  if (result.length === 0 || result[0].values.length === 0) return 0;
-  return result[0].values[0][0] as number;
 }
 
 export function getAudit(id: string): Record<string, unknown> | null {

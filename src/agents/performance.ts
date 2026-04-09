@@ -1,4 +1,5 @@
-import type { CROAgent, AgentInput, AgentAnalysis, Finding, Score } from '../models/interfaces.js';
+import type { CROAgent, AgentInput, AgentAnalysis, Finding } from '../models/interfaces.js';
+import { scoreToLabel } from '../utils/score.js';
 
 export function createPerformanceAgent(): CROAgent {
   return {
@@ -88,12 +89,4 @@ export function createPerformanceAgent(): CROAgent {
       };
     },
   };
-}
-
-function scoreToLabel(score: number): Score['label'] {
-  if (score >= 90) return 'excellent';
-  if (score >= 70) return 'good';
-  if (score >= 50) return 'fair';
-  if (score >= 30) return 'poor';
-  return 'critical';
 }
