@@ -58,7 +58,7 @@ export async function runPipeline(
     (async () => {
       onStatus?.('  → Gemini: analyzing visual hierarchy, trust signals, mobile...');
       try {
-        const r = await withPipelineTimeout(runGeminiConsolidated(input, gemini), 'Gemini', 60000);
+        const r = await withPipelineTimeout(runGeminiConsolidated(input, gemini), 'Gemini', 120000);
         onStatus?.('  ✓ Gemini analysis done');
         return r;
       } catch (err) {
