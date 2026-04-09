@@ -512,6 +512,10 @@
         progressSection.style.display = 'block';
         submitBtn.textContent = 'Analizando...';
         document.querySelector('.hero').classList.add('compact');
+        document.querySelector('.features-left').style.display = 'none';
+        document.querySelector('.features-right').style.display = 'none';
+        document.querySelector('.landing-layout').style.gridTemplateColumns = '1fr';
+        document.querySelector('.landing-layout').style.maxWidth = '560px';
         startMotivationalLoop();
         pollAudit(data.auditId);
 
