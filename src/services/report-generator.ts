@@ -66,10 +66,10 @@ export interface ReportUiStrings {
 }
 
 export const DEFAULT_UI_STRINGS: ReportUiStrings = {
-  reportSubtitle: 'CRO Audit Report',
+  reportSubtitle: 'Informe de Auditoría CRO',
   pancrocioSays: 'PanCROcio dice:',
   scoresByCategoryTitle: 'Puntuaciones por Categoría',
-  topQuickWinsTitle: 'Top Quick Wins',
+  topQuickWinsTitle: 'Quick Wins Principales',
   topQuickWinsSubtitle: 'Mejoras de alto impacto y bajo esfuerzo',
   problemLabel: 'Problema:',
   recommendationLabel: 'Recomendación:',
@@ -306,8 +306,8 @@ export function generateReportHtml(input: ReportInput): string {
   const ogLocale = OG_LOCALES[lang] || 'es_ES';
   const safeDate = escapeHtml(date);
   // SEO meta strings — kept short to fit Google/OG limits.
-  const seoTitle = `PanCROcio CRO Report \u2014 ${url} (${globalScore}/100)`;
-  const seoDescription = `${ui.reportSubtitle} \u2014 ${url}. Score ${globalScore}/100. ${quickWins.length} quick wins, ${mockups.length} mockups, ${analyses.length} category audits.`;
+  const seoTitle = `PanCROcio \u2014 ${ui.reportSubtitle} \u2014 ${url} (${globalScore}/100)`;
+  const seoDescription = `${ui.reportSubtitle} \u2014 ${url}. ${globalScore}/100 puntos. ${quickWins.length} quick wins, ${mockups.length} mockups, ${analyses.length} categorías analizadas.`;
   // Site origin: prefer explicit input, fall back to SITE_ORIGIN env var, default to weareboost.
   // Defensive: strip trailing slash and prepend https:// if the user forgot the protocol.
   const rawOrigin = (input.siteOrigin || process.env.SITE_ORIGIN || 'https://www.weareboost.online').replace(/\/$/, '');
@@ -319,8 +319,8 @@ export function generateReportHtml(input: ReportInput): string {
   const jsonLd = JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'Report',
-    name: `PanCROcio CRO Report for ${input.url}`,
-    headline: `CRO Audit \u2014 ${input.url}`,
+    name: `PanCROcio \u2014 ${ui.reportSubtitle} \u2014 ${input.url}`,
+    headline: `${ui.reportSubtitle} \u2014 ${input.url}`,
     description: seoDescription,
     inLanguage: lang,
     datePublished: date,
@@ -407,7 +407,7 @@ export function generateReportHtml(input: ReportInput): string {
   <meta property="og:description" content="${escapeHtml(seoDescription)}">
   <meta property="og:url" content="${escapeHtml(canonicalUrl)}">
   <meta property="og:image" content="${escapeHtml(ogImage)}">
-  <meta property="og:image:alt" content="PanCROcio CRO Audit Report">
+  <meta property="og:image:alt" content="PanCROcio — ${escapeHtml(ui.reportSubtitle)}">
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${escapeHtml(seoTitle)}">
