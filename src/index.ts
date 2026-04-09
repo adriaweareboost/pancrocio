@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, closeDatabase } from './services/database.js';
+import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
 import { createGroqProvider } from './services/groq.js';
@@ -23,6 +23,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const PORT = process.env.PORT || 3000;
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'croagent.db');
 
 // In-memory audit status tracking (auto-cleanup after 30 min)
 const PROGRESS_TTL_MS = 30 * 60 * 1000;
@@ -155,7 +156,7 @@ async function renderLocalizedReport(
   }
 
   // Tier 2: persistent DB cache (survives server restarts).
-  const dbCached = await getStoredTranslation(auditId, normalizedLang);
+  const dbCached = getStoredTranslation(auditId, normalizedLang);
   if (dbCached) {
     setCachedReport(cacheKey, dbCached);
     return dbCached;
@@ -177,7 +178,8 @@ async function renderLocalizedReport(
 
   const html = await translateAndRender(input, lang, llm);
   setCachedReport(cacheKey, html);
-  await storeTranslation(auditId, normalizedLang, html);
+  storeTranslation(auditId, normalizedLang, html);
+  saveDatabase(DB_PATH);
   return html;
 }
 
@@ -197,13 +199,14 @@ function cleanupProgress(): void {
 }
 
 async function main() {
-  // Init database (reads DATABASE_URL from env)
-  await initDatabase();
+  // Init database
+  await initDatabase(DB_PATH);
 
   // Recover orphaned audits from previous crashes
-  const recovered = await recoverOrphanedAudits();
+  const recovered = recoverOrphanedAudits();
   if (recovered > 0) {
     console.log(`Recovered ${recovered} orphaned audit(s) → marked as failed`);
+    saveDatabase(DB_PATH);
   }
 
   // Init LLM providers
@@ -240,7 +243,7 @@ async function main() {
     const normalized = normalizeUrl(url);
 
     // Remove previous audit for this URL if it exists (allows re-audit)
-    await deleteAuditByUrl(normalized);
+    deleteAuditByUrl(normalized);
 
     const leadId = uuid();
     const auditId = uuid();
@@ -248,9 +251,10 @@ async function main() {
     // Generate 6-digit verification code
     const verifyCode = String(crypto.randomInt(100000, 999999));
 
-    await createLead(leadId, email, url);
-    await createAudit(auditId, leadId, url, normalized);
-    await setVerifyCode(leadId, verifyCode);
+    createLead(leadId, email, url);
+    createAudit(auditId, leadId, url, normalized);
+    setVerifyCode(leadId, verifyCode);
+    saveDatabase(DB_PATH);
 
     // Log code (in production this would be sent via email)
     console.log(`[Verify] Audit ${auditId} — email: ${email} — code: ${verifyCode}`);
@@ -266,9 +270,10 @@ async function main() {
     });
 
     // Run audit in background
-    runAudit(auditId, url, gemini, groq).catch(async (err) => {
+    runAudit(auditId, url, gemini, groq).catch((err) => {
       console.error(`Audit ${auditId} failed:`, err);
-      await updateAuditStatus(auditId, 'failed').catch(() => {});
+      updateAuditStatus(auditId, 'failed');
+      saveDatabase(DB_PATH);
       auditProgress.set(auditId, {
         status: 'failed',
         messages: [...(auditProgress.get(auditId)?.messages || []), `Error: ${err.message}`],
@@ -278,8 +283,8 @@ async function main() {
   });
 
   // Check audit status
-  app.get('/api/v1/audit/:id', async (req, res) => {
-    const audit = await getAudit(req.params.id);
+  app.get('/api/v1/audit/:id', (req, res) => {
+    const audit = getAudit(req.params.id);
     if (!audit) {
       return res.status(404).json({ error: 'Audit not found', code: 'NOT_FOUND' });
     }
@@ -300,41 +305,46 @@ async function main() {
   });
 
   // Send verification code (re-send)
-  app.post('/api/v1/audit/:id/send-code', async (req, res) => {
-    const audit = await getAudit(req.params.id);
+  app.post('/api/v1/audit/:id/send-code', (req, res) => {
+    const audit = getAudit(req.params.id);
     if (!audit) {
       return res.status(404).json({ error: 'Audit not found', code: 'NOT_FOUND' });
     }
-    const email = await getLeadEmail(req.params.id);
+    const email = getLeadEmail(req.params.id);
     // Generate new code
     const newCode = String(crypto.randomInt(100000, 999999));
-    const leadId = audit.lead_id as string;
-    await setVerifyCode(leadId, newCode);
-    console.log(`[Verify] Re-sent code for ${req.params.id} — email: ${email} — code: ${newCode}`);
+    const leadResult = getAudit(req.params.id);
+    if (leadResult) {
+      const leadId = leadResult.lead_id as string;
+      setVerifyCode(leadId, newCode);
+      saveDatabase(DB_PATH);
+      console.log(`[Verify] Re-sent code for ${req.params.id} — email: ${email} — code: ${newCode}`);
+    }
     res.json({ ok: true, message: 'Verification code sent to your email' });
   });
 
   // Verify email code
-  app.post('/api/v1/audit/:id/verify', async (req, res) => {
+  app.post('/api/v1/audit/:id/verify', (req, res) => {
     const { code } = req.body;
     if (!code) {
       return res.status(400).json({ error: 'Code is required', code: 'MISSING_CODE' });
     }
-    const success = await verifyEmailCode(req.params.id, String(code));
+    const success = verifyEmailCode(req.params.id, String(code));
     if (!success) {
       return res.status(403).json({ error: 'Invalid verification code', code: 'INVALID_CODE' });
     }
+    saveDatabase(DB_PATH);
     res.json({ ok: true, verified: true });
   });
 
   // Check verification status
-  app.get('/api/v1/audit/:id/verified', async (req, res) => {
-    res.json({ verified: await isEmailVerified(req.params.id) });
+  app.get('/api/v1/audit/:id/verified', (req, res) => {
+    res.json({ verified: isEmailVerified(req.params.id) });
   });
 
   // Get report
   app.get('/api/v1/audit/:id/report', async (req, res) => {
-    const audit = await getAudit(req.params.id);
+    const audit = getAudit(req.params.id);
     if (!audit) {
       return res.status(404).json({ error: 'Audit not found', code: 'NOT_FOUND' });
     }
@@ -353,7 +363,7 @@ async function main() {
       reportHtml = audit.report_html as string;
     }
 
-    const verified = await isEmailVerified(req.params.id);
+    const verified = isEmailVerified(req.params.id);
 
     if (verified) {
       res.setHeader('Content-Type', 'text/html');
@@ -372,14 +382,14 @@ async function main() {
 
   // Download report as PDF (cached in DB by auditId+lang)
   app.get('/api/v1/audit/:id/pdf', async (req, res) => {
-    const audit = await getAudit(req.params.id);
+    const audit = getAudit(req.params.id);
     if (!audit) {
       return res.status(404).json({ error: 'Audit not found', code: 'NOT_FOUND' });
     }
     if (audit.status !== 'completed') {
       return res.status(202).json({ error: 'Audit still in progress', code: 'AUDIT_IN_PROGRESS', status: audit.status });
     }
-    if (!(await isEmailVerified(req.params.id))) {
+    if (!isEmailVerified(req.params.id)) {
       return res.status(403).json({ error: 'Email verification required', code: 'EMAIL_NOT_VERIFIED' });
     }
 
@@ -388,7 +398,7 @@ async function main() {
     const filename = pdfFilename(audit.url as string, normalizedLang);
 
     // Tier 1: persistent DB cache.
-    const cached = await getStoredPdf(req.params.id, normalizedLang);
+    const cached = getStoredPdf(req.params.id, normalizedLang);
     if (cached) {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -400,7 +410,8 @@ async function main() {
     try {
       const html = await renderLocalizedReport(audit, lang, groq);
       const pdf = await generateReportPdf(html);
-      await storePdf(req.params.id, normalizedLang, pdf);
+      storePdf(req.params.id, normalizedLang, pdf);
+      saveDatabase(DB_PATH);
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -468,7 +479,6 @@ async function main() {
   process.on('SIGINT', async () => {
     console.log('\nShutting down...');
     await closeBrowser();
-    await closeDatabase();
     process.exit(0);
   });
 }
@@ -487,19 +497,22 @@ async function runAudit(
 
   // Step 1: Scrape
   addMessage('Scraping website...');
-  await updateAuditStatus(auditId, 'scraping');
+  updateAuditStatus(auditId, 'scraping');
+  saveDatabase(DB_PATH);
   const scrapingResult = await scrapeUrl(url);
   addMessage(`Scraped: ${(Buffer.byteLength(scrapingResult.html) / 1024).toFixed(0)}KB HTML, screenshots captured`);
 
   // Step 2: Analyze
   addMessage('Running CRO analysis agents...');
-  await updateAuditStatus(auditId, 'analyzing');
+  updateAuditStatus(auditId, 'analyzing');
+  saveDatabase(DB_PATH);
 
   const pipelineResult = await runPipeline(scrapingResult, url, gemini, groq, addMessage);
 
   // Step 3: Generate report
   addMessage('Generating report...');
-  await updateAuditStatus(auditId, 'generating_report');
+  updateAuditStatus(auditId, 'generating_report');
+  saveDatabase(DB_PATH);
 
   const reportHtml = generateReportHtml({
     url,
@@ -514,7 +527,7 @@ async function runAudit(
   });
 
   // Step 4: Save
-  await completeAudit(
+  completeAudit(
     auditId,
     pipelineResult.globalScore,
     JSON.stringify(pipelineResult.scores),
@@ -523,6 +536,7 @@ async function runAudit(
     JSON.stringify(pipelineResult.analyses),
     reportHtml,
   );
+  saveDatabase(DB_PATH);
 
   addMessage('Audit complete!');
   progress.status = 'completed';
