@@ -580,9 +580,13 @@
             submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
 
             setTimeout(() => {
+              // Hide landing elements, show only the report
+              document.querySelector('.hero').style.display = 'none';
+              document.querySelector('.landing-layout').style.display = 'none';
+              document.querySelector('.footer').style.display = 'none';
               reportFrame.style.display = 'block';
               reportIframe.src = `/api/v1/audit/${auditId}/report`;
-              reportFrame.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              window.scrollTo({ top: 0, behavior: 'smooth' });
 
               reportIframe.onload = () => {
                 try {
