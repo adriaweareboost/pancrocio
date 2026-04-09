@@ -516,6 +516,9 @@
         document.querySelector('.features-right').style.display = 'none';
         document.querySelector('.landing-layout').style.gridTemplateColumns = '1fr';
         document.querySelector('.landing-layout').style.maxWidth = '560px';
+        // Force technical details open
+        var detailsEl = progressSection.querySelector('details');
+        if (detailsEl) detailsEl.open = true;
         startMotivationalLoop();
         pollAudit(data.auditId);
 
