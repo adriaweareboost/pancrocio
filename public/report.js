@@ -46,7 +46,7 @@
     btn.disabled = true;
     btn.textContent = sendingLabel;
 
-    fetch('https://www.weareboost.online/api/contact', {
+    fetch('https://weareboost.online/api/contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
