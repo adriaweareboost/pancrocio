@@ -4,6 +4,8 @@ import { CATEGORY_LABELS } from '../utils/constants.js';
 function buildMockupPrompt(quickWin: QuickWin, url: string, pageDescription: string): string {
   return `You are an expert UI/UX designer creating a wireframe mockup to illustrate a CRO improvement.
 
+IMPORTANT: All text content in the mockup (titles, labels, descriptions) MUST be written in the SAME LANGUAGE as the website being analyzed.
+
 CONTEXT:
 - Website: ${url}
 - Current page description: ${pageDescription}
