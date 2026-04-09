@@ -395,7 +395,7 @@ async function main() {
     }
 
     // Detect target language: ?lang= query param overrides Accept-Language header.
-    const lang = (req.query.lang as string) || parseAcceptLanguage(req.headers['accept-language']);
+    const lang = (req.query.lang as string) || 'es';
 
     let reportHtml: string;
     try {
@@ -432,7 +432,7 @@ async function main() {
       return res.status(403).json({ error: 'Email verification required', code: 'EMAIL_NOT_VERIFIED' });
     }
 
-    const lang = (req.query.lang as string) || parseAcceptLanguage(req.headers['accept-language']);
+    const lang = (req.query.lang as string) || 'es';
     const normalizedLang = normalizeLangCode(lang);
     const filename = pdfFilename(audit.url as string, normalizedLang);
 
@@ -470,7 +470,7 @@ async function main() {
   // Preview report with mock data (for UI/CSS testing — no DB, no verify gate).
   // Supports ?lang=fr to test translations, or falls back to Accept-Language.
   app.get('/preview', async (req, res) => {
-    const lang = (req.query.lang as string) || parseAcceptLanguage(req.headers['accept-language']);
+    const lang = (req.query.lang as string) || 'es';
     const normalizedLang = normalizeLangCode(lang);
     const cacheKey = `preview|${normalizedLang}`;
     const cached = getCachedReport(cacheKey);
@@ -495,7 +495,7 @@ async function main() {
 
   // Preview PDF — same mock data, regenerated each time (no cache, dev only).
   app.get('/preview/pdf', async (req, res) => {
-    const lang = (req.query.lang as string) || parseAcceptLanguage(req.headers['accept-language']);
+    const lang = (req.query.lang as string) || 'es';
     try {
       const html = await translateAndRender(buildMockReportInput(), lang, groq);
       const pdf = await generateReportPdf(html);
