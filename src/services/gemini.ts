@@ -54,7 +54,7 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
 
 export function createGeminiProvider(apiKey: string): LLMProvider {
   const genAI = new GoogleGenerativeAI(apiKey);
-  const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
+  const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const model = genAI.getGenerativeModel({ model: modelName });
   const enqueue = createQueue();
 
