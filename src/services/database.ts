@@ -1,5 +1,6 @@
 import initSqlJs, { Database } from 'sql.js';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, mkdirSync } from 'fs';
+import { writeFile } from 'fs/promises';
 import { dirname } from 'path';
 
 let db: Database;
@@ -84,10 +85,18 @@ export async function initDatabase(dbPath: string): Promise<Database> {
   return db;
 }
 
-export function saveDatabase(dbPath: string): void {
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  writeFileSync(dbPath, buffer);
+let saveInProgress = false;
+
+export async function saveDatabase(dbPath: string): Promise<void> {
+  if (saveInProgress) return; // debounce concurrent saves
+  saveInProgress = true;
+  try {
+    const data = db.export();
+    const buffer = Buffer.from(data);
+    await writeFile(dbPath, buffer);
+  } finally {
+    saveInProgress = false;
+  }
 }
 
 export function createLead(id: string, email: string, url: string): void {

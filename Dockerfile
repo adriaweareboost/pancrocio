@@ -1,3 +1,15 @@
+# ── Stage 1: Build ──
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# ── Stage 2: Production ──
 FROM node:20-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -10,12 +22,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --production=false
+RUN npm ci --omit=dev
 
 RUN npx playwright install chromium --with-deps
 
-COPY . .
-RUN npm run build
+# Copy compiled output + public assets from builder
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/public ./public
 
 RUN mkdir -p /app/data
 
