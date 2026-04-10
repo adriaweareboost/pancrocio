@@ -590,10 +590,17 @@ async function runAudit(
     }
   }
 
-  // Step 4: Generate report
+  // Step 4: Translate UI strings if not Spanish, then generate report
   addMessage('Generando informe...');
   updateAuditStatus(auditId, 'generating_report');
   saveDatabase(DB_PATH);
+
+  let uiStrings = undefined;
+  if (lang !== 'es') {
+    try {
+      uiStrings = await getCachedUiStrings(lang, gemini);
+    } catch { /* fallback to Spanish defaults */ }
+  }
 
   const reportHtml = generateReportHtml({
     url,
@@ -604,6 +611,7 @@ async function runAudit(
     analyses,
     date: new Date().toISOString().split('T')[0],
     lang,
+    uiStrings,
     pdfUrl: `/api/v1/audit/${auditId}/pdf?lang=${lang}`,
   });
 
