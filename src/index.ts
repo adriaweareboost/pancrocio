@@ -254,8 +254,8 @@ async function main() {
       } else {
         console.log(`[Cache] Reusing audit ${cachedAudit.id} for ${url} — ${hashEmail(email)}`);
       }
-      sendVerifyCodeEmail(email, cachedCode).catch(() => {});
-      sendLeadNotification(email, url, cachedAudit.global_score as number, cachedAudit.id as string).catch(() => {});
+      sendVerifyCodeEmail(email, cachedCode, auditLang).catch(() => {});
+      sendLeadNotification(email, url, auditLang, cachedAudit.global_score as number, cachedAudit.id as string).catch(() => {});
       return res.status(201).json({
         auditId: cachedAudit.id,
         status: 'completed',
@@ -284,8 +284,8 @@ async function main() {
     } else {
       console.log(`[Verify] Audit ${auditId} — email: ${hashEmail(email)} — code sent via email`);
     }
-    sendVerifyCodeEmail(email, verifyCode).catch(() => {});
-    sendLeadNotification(email, url, undefined, auditId).catch(() => {});
+    sendVerifyCodeEmail(email, verifyCode, auditLang).catch(() => {});
+    sendLeadNotification(email, url, auditLang, undefined, auditId).catch(() => {});
 
     cleanupProgress();
     cleanupReportCache();
@@ -347,7 +347,7 @@ async function main() {
       setVerifyCode(leadId, newCode);
       saveDatabase(DB_PATH);
       console.log(`[Verify] Re-sent code for ${req.params.id} — email: ${email} — code: ${newCode}`);
-      if (email) sendVerifyCodeEmail(email, newCode).catch(() => {});
+      if (email) sendVerifyCodeEmail(email, newCode, 'es').catch(() => {});
     }
     res.json({ ok: true, message: 'Verification code sent to your email' });
   });
@@ -390,9 +390,8 @@ async function main() {
       } catch (err) {
         console.warn(`[Email] PDF generation failed for report email:`, (err as Error).message);
       }
-      await sendReportEmail(email, audit.url as string, audit.global_score as number, reportUrl, pdfBuf, pdfName);
-      // Update internal notification with score
-      await sendLeadNotification(email, audit.url as string, audit.global_score as number, auditId);
+      await sendReportEmail(email, audit.url as string, audit.global_score as number, reportUrl, lang, pdfBuf, pdfName);
+      await sendLeadNotification(email, audit.url as string, lang, audit.global_score as number, auditId);
     })().catch(err => console.error('[Email] Report email failed:', err));
   });
 
@@ -635,10 +634,10 @@ async function runAudit(
         pdfBuf = await generateReportPdf(reportHtml);
         storePdf(auditId, 'es', pdfBuf);
         saveDatabase(DB_PATH);
-        pdfName = pdfFilename(url, 'es');
+        pdfName = pdfFilename(url, lang);
       } catch { /* PDF optional */ }
-      sendReportEmail(email, url, pipelineResult.globalScore, reportUrl, pdfBuf, pdfName).catch(() => {});
-      sendLeadNotification(email, url, pipelineResult.globalScore, auditId).catch(() => {});
+      sendReportEmail(email, url, pipelineResult.globalScore, reportUrl, lang, pdfBuf, pdfName).catch(() => {});
+      sendLeadNotification(email, url, lang, pipelineResult.globalScore, auditId).catch(() => {});
     }
   }
 }
