@@ -462,7 +462,10 @@ export function generateReportHtml(input: ReportInput): string {
     },
   }).replace(/</g, '\\u003c');
 
-  const categoryKeys = Object.keys(CATEGORY_LABELS) as (keyof CategoryScores)[];
+  // Only show categories that have real analysis data (score > 0)
+  const availableCategories = new Set(analyses.map(a => a.category));
+  const categoryKeys = (Object.keys(CATEGORY_LABELS) as (keyof CategoryScores)[])
+    .filter(key => availableCategories.has(key));
   const categoryBars = categoryKeys
     .map((key) => renderCategoryBar(categoryLabel(key, ui), key, scores[key]))
     .join('');
@@ -574,13 +577,15 @@ export function generateReportHtml(input: ReportInput): string {
         </blockquote>
       </div>
 
-      <!-- Category Scores -->
+      <!-- Category Scores (hidden if no categories available) -->
+      ${categoryKeys.length > 0 ? `
       <div style="background:white;border-radius:20px;padding:28px;margin-bottom:24px;box-shadow:0 4px 24px rgba(7,15,45,0.08)">
         <section aria-labelledby="scores-title">
           <h2 id="scores-title" style="font-size:18px;margin-bottom:20px;color:#070F2D;font-weight:700">${escapeHtml(ui.scoresByCategoryTitle)}</h2>
           <nav aria-label="${escapeHtml(ui.scoresByCategoryTitle)}">${categoryBars}</nav>
         </section>
       </div>
+      ` : ''}
 
       <!-- QuickWins -->
       ${quickWins.length > 0 ? `
@@ -625,7 +630,8 @@ export function generateReportHtml(input: ReportInput): string {
       </div>
       ` : ''}
 
-      <!-- Detailed Analysis -->
+      <!-- Detailed Analysis (hidden if no analyses available) -->
+      ${analyses.length > 0 ? `
       <div style="background:white;border-radius:20px;padding:28px;box-shadow:0 4px 24px rgba(7,15,45,0.08)">
         <section aria-labelledby="detailed-title">
           <header class="section-heading" style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
@@ -635,6 +641,7 @@ export function generateReportHtml(input: ReportInput): string {
           ${detailSections}
         </section>
       </div>
+      ` : ''}
 
       ${renderContactCta(ui)}
 

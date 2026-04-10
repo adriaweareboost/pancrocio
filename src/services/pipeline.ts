@@ -91,53 +91,38 @@ export async function runPipeline(
     })(),
   ]);
 
-  // Collect all analyses
+  // Collect only successful analyses — failed agents are excluded from the report
   const analyses: AgentAnalysis[] = [];
-  const fallbackScore: Score = { value: 50, label: 'fair' };
-  const fallbackAnalysis = (name: string, cat: keyof CategoryScores): AgentAnalysis => ({
-    agentName: name,
-    category: cat,
-    score: fallbackScore,
-    findings: [{ title: 'Análisis no disponible', description: 'No se pudo completar el análisis.', severity: 'info', recommendation: 'Solicitar revisión manual.' }],
-    executionTimeMs: 0,
-  });
 
   if (geminiResult) {
     analyses.push(geminiResult.visualHierarchy, geminiResult.trustSignals, geminiResult.mobileExperience);
-  } else {
-    analyses.push(
-      fallbackAnalysis('Visual Hierarchy Agent', 'visualHierarchy'),
-      fallbackAnalysis('Trust Signals Agent', 'trustSignals'),
-      fallbackAnalysis('Mobile Experience Agent', 'mobileExperience'),
-    );
   }
 
   if (groqResult) {
     analyses.push(groqResult.copyMessaging, groqResult.uxHeuristics);
-  } else {
-    analyses.push(
-      fallbackAnalysis('Copy Analysis Agent', 'copyMessaging'),
-      fallbackAnalysis('UX Heuristics Agent', 'uxHeuristics'),
-    );
   }
 
   analyses.push(perfResult);
 
-  // Build category scores
+  // Build category scores (only for categories with real data)
+  const availableCategories = new Set(analyses.map(a => a.category));
+  const defaultScore: Score = { value: 0, label: 'critical' };
   const scores: CategoryScores = {
-    visualHierarchy: findScore(analyses, 'visualHierarchy'),
-    uxHeuristics: findScore(analyses, 'uxHeuristics'),
-    copyMessaging: findScore(analyses, 'copyMessaging'),
-    trustSignals: findScore(analyses, 'trustSignals'),
-    mobileExperience: findScore(analyses, 'mobileExperience'),
+    visualHierarchy: availableCategories.has('visualHierarchy') ? findScore(analyses, 'visualHierarchy') : defaultScore,
+    uxHeuristics: availableCategories.has('uxHeuristics') ? findScore(analyses, 'uxHeuristics') : defaultScore,
+    copyMessaging: availableCategories.has('copyMessaging') ? findScore(analyses, 'copyMessaging') : defaultScore,
+    trustSignals: availableCategories.has('trustSignals') ? findScore(analyses, 'trustSignals') : defaultScore,
+    mobileExperience: availableCategories.has('mobileExperience') ? findScore(analyses, 'mobileExperience') : defaultScore,
     performance: findScore(analyses, 'performance'),
   };
 
-  // Calculate global score
+  // Calculate global score from available categories only (reweight)
+  const availableWeights = Object.entries(CATEGORY_WEIGHTS)
+    .filter(([key]) => availableCategories.has(key as keyof CategoryScores));
+  const totalWeight = availableWeights.reduce((sum, [, w]) => sum + w, 0) || 1;
   const globalScore = Math.round(
-    Object.entries(CATEGORY_WEIGHTS).reduce((sum, [key, weight]) => {
-      const catScore = scores[key as keyof CategoryScores];
-      return sum + catScore.value * weight;
+    availableWeights.reduce((sum, [key, weight]) => {
+      return sum + scores[key as keyof CategoryScores].value * (weight / totalWeight);
     }, 0)
   );
 
