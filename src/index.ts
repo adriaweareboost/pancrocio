@@ -16,12 +16,16 @@ import { initEmail, sendVerifyCodeEmail, sendReportEmail, sendLeadNotification }
 import { parseAcceptLanguage, shouldTranslate, normalizeLangCode, translateReportData, translateUiStrings, translateVerifyStrings } from './agents/translator.js';
 import type { LLMProvider, AgentAnalysis, QuickWin, Mockup, CategoryScores } from './models/interfaces.js';
 import { normalizeUrl, isValidUrl, isValidEmail } from './utils/normalize-url.js';
+import { auditRateLimit, generalRateLimit, honeypotCheck, securityHeaders, corsProtection, hashEmail } from './services/security.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
-app.use(express.json());
+app.use(securityHeaders);
+app.use(corsProtection);
+app.use(express.json({ limit: '1mb' })); // limit body size
 app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use('/api/', generalRateLimit);
 
 const PORT = process.env.PORT || 3000;
 const SITE_ORIGIN = (process.env.SITE_ORIGIN || 'https://pancrocio-production.up.railway.app').replace(/\/$/, '');
@@ -230,8 +234,8 @@ async function main() {
 
   // ─── API Routes ───
 
-  // Submit audit
-  app.post('/api/v1/audit', async (req, res) => {
+  // Submit audit (rate limited: 5/hour/IP, honeypot protected)
+  app.post('/api/v1/audit', auditRateLimit, honeypotCheck, async (req, res) => {
     const { email, url } = req.body;
 
     if (!email || !isValidEmail(email)) {
@@ -261,7 +265,7 @@ async function main() {
     if (process.env.NODE_ENV !== 'production') {
       console.log(`[Verify] Audit ${auditId} — email: ${email} — code: ${verifyCode}`);
     } else {
-      console.log(`[Verify] Audit ${auditId} — email: ${email} — code sent via email`);
+      console.log(`[Verify] Audit ${auditId} — email: ${hashEmail(email)} — code sent via email`);
     }
     sendVerifyCodeEmail(email, verifyCode).catch(() => {});
     sendLeadNotification(email, url, undefined, auditId).catch(() => {});

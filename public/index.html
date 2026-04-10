@@ -359,6 +359,10 @@
         <label for="url" data-i18n="urlLabel">URL de tu web</label>
         <input type="url" id="url" placeholder="https://yoursite.com" required>
       </div>
+      <!-- Honeypot: invisible to humans, bots fill it in → silently rejected -->
+      <div style="position:absolute;left:-9999px;top:-9999px" aria-hidden="true">
+        <input type="text" name="website" id="hp_website" tabindex="-1" autocomplete="off">
+      </div>
       <button type="submit" class="submit-btn" id="submitBtn" data-i18n="submitBtn">Analizar mi web</button>
     </form>
 
@@ -656,10 +660,11 @@
       submitBtn.textContent = t('starting');
 
       try {
+        const honeypot = document.getElementById('hp_website').value;
         const res = await fetch('/api/v1/audit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, url }),
+          body: JSON.stringify({ email, url, website: honeypot }),
         });
 
         const data = await res.json();
