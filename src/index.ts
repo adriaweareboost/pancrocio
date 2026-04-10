@@ -205,7 +205,14 @@ async function main() {
     process.exit(1);
   }
 
-  const gemini = createGeminiProvider(geminiKey);
+  // 3 parallel Gemini providers with separate keys/queues for max throughput
+  const geminiVision = createGeminiProvider(geminiKey);                                     // Vision: screenshots
+  const geminiText = createGeminiProvider(process.env.GEMINI_API_KEY_2 || geminiKey);       // Text: copy + UX
+  const geminiTranslate = createGeminiProvider(process.env.GEMINI_API_KEY_3 || geminiKey);  // Translation + mockups
+  const gemini = geminiVision; // default for backwards compat
+
+  if (process.env.GEMINI_API_KEY_2) console.log('[LLM] 3-provider mode: vision + text + translate (parallel)');
+  else console.log('[LLM] Single-provider mode');
 
   // Init email service (reads RESEND_API_KEY from env; falls back to console.log)
   initEmail();
@@ -302,7 +309,7 @@ async function main() {
     });
 
     // Run audit in background
-    runAudit(auditId, url, gemini, auditLang).catch((err) => {
+    runAudit(auditId, url, gemini, auditLang, { vision: geminiVision, text: geminiText, mockups: geminiTranslate }).catch((err) => {
       console.error(`Audit ${auditId} failed:`, err);
       updateAuditStatus(auditId, 'failed');
       saveDatabase(DB_PATH);
@@ -566,6 +573,7 @@ async function runAudit(
   url: string,
   gemini: ReturnType<typeof createGeminiProvider>,
   lang = 'es',
+  providers?: import('./services/pipeline.js').PipelineProviders,
 ) {
   let progress = auditProgress.get(auditId);
   if (!progress) {
@@ -589,7 +597,7 @@ async function runAudit(
   updateAuditStatus(auditId, 'analyzing');
   saveDatabase(DB_PATH);
 
-  const pipelineResult = await runPipeline(scrapingResult, url, gemini, addMessage);
+  const pipelineResult = await runPipeline(scrapingResult, url, gemini, addMessage, providers);
 
   // Check if we got meaningful results (at least 2 categories beyond Performance)
   const realCategories = pipelineResult.analyses.filter(a => a.category !== 'performance').length;
@@ -606,10 +614,11 @@ async function runAudit(
   if (lang !== 'en') {
     addMessage('Translating results...');
     try {
+      const translateLlm = providers?.mockups || gemini;
       const translated = await translateReportData(
         { quickWins, mockups, analyses },
         lang,
-        gemini,
+        translateLlm,
         true, // force: LLM responds in English, translate to target lang
       );
       quickWins = translated.quickWins;
@@ -628,7 +637,7 @@ async function runAudit(
   let uiStrings = undefined;
   if (lang !== 'es') {
     try {
-      uiStrings = await getCachedUiStrings(lang, gemini);
+      uiStrings = await getCachedUiStrings(lang, providers?.mockups || gemini);
     } catch { /* fallback to Spanish defaults */ }
   }
 

@@ -21,12 +21,22 @@ export interface PipelineResult {
   mockups: Mockup[];
 }
 
+export interface PipelineProviders {
+  vision: LLMProvider;   // Screenshot analysis (visual + trust + mobile)
+  text: LLMProvider;     // HTML/copy analysis (copy + UX)
+  mockups: LLMProvider;  // Wireframe generation
+}
+
 export async function runPipeline(
   scrapingResult: ScrapingResult,
   url: string,
   gemini: LLMProvider,
   onStatus?: (msg: string) => void,
+  providers?: PipelineProviders,
 ): Promise<PipelineResult> {
+  const visionLlm = providers?.vision || gemini;
+  const textLlm = providers?.text || gemini;
+  const mockupLlm = providers?.mockups || gemini;
   const pipelineStart = Date.now();
   const input: AgentInput = {
     url,
@@ -55,7 +65,7 @@ export async function runPipeline(
     (async () => {
       onStatus?.('  → Gemini: analyzing visual hierarchy, trust signals, mobile...');
       try {
-        const r = await withPipelineTimeout(runGeminiConsolidated(input, gemini), 'Gemini', 120000);
+        const r = await withPipelineTimeout(runGeminiConsolidated(input, visionLlm), 'Vision', 120000);
         onStatus?.('  ✓ Gemini analysis done');
         return r;
       } catch (err) {
@@ -69,7 +79,7 @@ export async function runPipeline(
     (async () => {
       onStatus?.('  → Text analysis: analyzing copy, UX heuristics...');
       try {
-        const r = await withPipelineTimeout(runGroqConsolidated(scrapingResult.html, url, gemini), 'Text analysis', 120000);
+        const r = await withPipelineTimeout(runGroqConsolidated(scrapingResult.html, url, textLlm), 'Text analysis', 120000);
         onStatus?.('  ✓ Text analysis done');
         return r;
       } catch (err) {
@@ -133,7 +143,7 @@ export async function runPipeline(
     onStatus?.('Generating wireframe mockup...');
     try {
       mockups = await withPipelineTimeout(
-        generateMockups(quickWins, url, gemini, scrapingResult.screenshotDesktop, onStatus, gemini, scrapingResult.html),
+        generateMockups(quickWins, url, mockupLlm, scrapingResult.screenshotDesktop, onStatus, mockupLlm, scrapingResult.html),
         'Mockup',
         45000,
       );
