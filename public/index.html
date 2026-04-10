@@ -380,7 +380,7 @@
       <div class="elapsed-timer" id="elapsedTimer"></div>
 
       <div style="margin-top:12px">
-        <p style="font-size:12px;color:#9ca3af;margin-bottom:8px">Detalles técnicos</p>
+        <p style="font-size:12px;color:#9ca3af;margin-bottom:8px" data-i18n="techDetails">Detalles técnicos</p>
         <div class="progress-messages" id="progressMessages"></div>
       </div>
     </div>
@@ -554,22 +554,41 @@
     const statChecks = document.getElementById('statChecks');
     const statTime = document.getElementById('statTime');
 
-    const MOTIVATIONAL_MESSAGES = [
-      { icon: '&#x1F50D;', title: 'Escaneando tu web...', text: 'Nuestra IA está cargando tu sitio y tomando capturas de pantalla desde escritorio y móvil.' },
-      { icon: '&#x1F3AF;', title: 'Analizando jerarquía visual...', text: '¿Sabías que los usuarios se forman una opinión de tu web en solo 50 milisegundos? La primera impresión importa.' },
-      { icon: '&#x1F4CA;', title: 'Evaluando elementos de conversión...', text: 'La tasa de conversión media de un sitio web es del 2,35%. Los mejores superan el 5,31%.' },
-      { icon: '&#x270D;&#xFE0F;', title: 'Revisando tu copy...', text: 'Los titulares con números reciben un 36% más de clics. Los CTAs específicos convierten un 202% mejor que los genéricos.' },
-      { icon: '&#x1F6E1;&#xFE0F;', title: 'Comprobando señales de confianza...', text: 'El 88% de los consumidores confía en las reseñas online tanto como en las recomendaciones personales.' },
-      { icon: '&#x1F4F1;', title: 'Evaluando experiencia móvil...', text: 'El 61% de los usuarios no vuelve a un sitio móvil donde tuvo problemas de acceso. La UX móvil es crítica.' },
-      { icon: '&#x26A1;', title: 'Midiendo rendimiento...', text: 'Un retraso de 1 segundo en la carga puede reducir las conversiones un 7%. La velocidad impacta directamente en tu negocio.' },
-      { icon: '&#x1F9E0;', title: 'La IA está sintetizando hallazgos...', text: 'Nuestros agentes están cruzando patrones de miles de webs de alta conversión.' },
-      { icon: '&#x1F3A8;', title: 'Generando wireframes de mejora...', text: 'Estamos creando mockups visuales mostrando exactamente cómo podría verse tu sitio con los cambios sugeridos.' },
-      { icon: '&#x1F680;', title: '¡Casi listo!', text: 'Las empresas que hacen A/B testing en sus landings ven un aumento medio del 30% en conversiones. Tu informe te dirá por dónde empezar.' },
-      { icon: '&#x1F4A1;', title: 'Dato curioso...', text: 'Cambiar un botón de verde a rojo aumentó las conversiones un 21% para HubSpot. Pequeños cambios, gran impacto.' },
-      { icon: '&#x1F4B0;', title: 'Merece la pena esperar...', text: 'Por cada 1€ invertido en UX, las empresas obtienen 100€ de retorno. Un ROI del 9.900%.' },
-      { icon: '&#x1F50E;', title: 'Análisis profundo en curso...', text: 'Revisamos más de 50 factores CRO: layout, copy, elementos de confianza, UX móvil y velocidad.' },
-      { icon: '&#x2705;', title: 'Priorizando quick wins...', text: 'Clasificamos las mejoras por impacto vs esfuerzo para que sepas exactamente qué arreglar primero.' },
-    ];
+    const MOTIVATIONAL_BY_LANG = {
+      es: [
+        { icon: '&#x1F50D;', title: 'Escaneando tu web...', text: 'Nuestra IA está cargando tu sitio y tomando capturas de pantalla desde escritorio y móvil.' },
+        { icon: '&#x1F3AF;', title: 'Analizando jerarquía visual...', text: '¿Sabías que los usuarios se forman una opinión de tu web en solo 50 milisegundos?' },
+        { icon: '&#x1F4CA;', title: 'Evaluando conversión...', text: 'La tasa de conversión media es del 2,35%. Los mejores superan el 5,31%.' },
+        { icon: '&#x270D;&#xFE0F;', title: 'Revisando tu copy...', text: 'Los titulares con números reciben un 36% más de clics.' },
+        { icon: '&#x1F6E1;&#xFE0F;', title: 'Comprobando confianza...', text: 'El 88% de consumidores confía en reseñas online tanto como en recomendaciones personales.' },
+        { icon: '&#x1F4F1;', title: 'Evaluando experiencia móvil...', text: 'El 61% no vuelve a un sitio móvil con problemas de acceso.' },
+        { icon: '&#x26A1;', title: 'Midiendo rendimiento...', text: '1 segundo de retraso puede reducir conversiones un 7%.' },
+        { icon: '&#x1F9E0;', title: 'Sintetizando hallazgos...', text: 'Cruzando patrones de miles de webs de alta conversión.' },
+        { icon: '&#x1F3A8;', title: 'Generando wireframes...', text: 'Creando mockups visuales con los cambios sugeridos.' },
+        { icon: '&#x1F680;', title: '¡Casi listo!', text: 'El A/B testing genera un 30% más de conversiones de media.' },
+        { icon: '&#x1F4A1;', title: 'Dato curioso...', text: 'Cambiar un botón de verde a rojo aumentó conversiones un 21% en HubSpot.' },
+        { icon: '&#x1F50E;', title: 'Análisis profundo...', text: 'Revisamos más de 50 factores CRO.' },
+        { icon: '&#x2705;', title: 'Priorizando quick wins...', text: 'Clasificamos mejoras por impacto vs esfuerzo.' },
+      ],
+      en: [
+        { icon: '&#x1F50D;', title: 'Scanning your website...', text: 'Our AI is loading your site and taking screenshots from desktop and mobile viewpoints.' },
+        { icon: '&#x1F3AF;', title: 'Analyzing visual hierarchy...', text: 'Users form an opinion about your site in just 50 milliseconds. First impressions matter!' },
+        { icon: '&#x1F4CA;', title: 'Evaluating conversion...', text: 'The average website conversion rate is 2.35%. Top performers achieve 5.31%.' },
+        { icon: '&#x270D;&#xFE0F;', title: 'Reviewing your copy...', text: 'Headlines with numbers get 36% more clicks.' },
+        { icon: '&#x1F6E1;&#xFE0F;', title: 'Checking trust signals...', text: '88% of consumers trust online reviews as much as personal recommendations.' },
+        { icon: '&#x1F4F1;', title: 'Testing mobile experience...', text: '61% of users won\'t return to a mobile site they had trouble accessing.' },
+        { icon: '&#x26A1;', title: 'Measuring performance...', text: 'A 1-second delay in page load can reduce conversions by 7%.' },
+        { icon: '&#x1F9E0;', title: 'Synthesizing findings...', text: 'Cross-referencing patterns from thousands of high-converting websites.' },
+        { icon: '&#x1F3A8;', title: 'Generating wireframes...', text: 'Creating visual mockups showing how your site could look with suggested changes.' },
+        { icon: '&#x1F680;', title: 'Almost there!', text: 'A/B testing landing pages sees an average 30% lift in conversions.' },
+        { icon: '&#x1F4A1;', title: 'Fun fact...', text: 'Changing a button from green to red increased conversions by 21% for HubSpot.' },
+        { icon: '&#x1F50E;', title: 'Deep analysis...', text: 'We check over 50 CRO factors including layout, copy, trust, mobile UX, and speed.' },
+        { icon: '&#x2705;', title: 'Prioritizing quick wins...', text: 'Ranking improvements by impact vs effort so you know what to fix first.' },
+      ],
+    };
+    function getMotivationalMessages() {
+      return MOTIVATIONAL_BY_LANG[currentLang] || MOTIVATIONAL_BY_LANG.en;
+    }
 
     let motivationalIndex = 0;
     let motivationalInterval = null;
@@ -577,7 +596,8 @@
     let startTime = null;
 
     function showMotivational() {
-      const msg = MOTIVATIONAL_MESSAGES[motivationalIndex % MOTIVATIONAL_MESSAGES.length];
+      const msgs = getMotivationalMessages();
+      const msg = msgs[motivationalIndex % msgs.length];
       motivationalCard.style.animation = 'none';
       motivationalCard.offsetHeight;
       motivationalCard.style.animation = 'fadeSlide 0.5s ease';
