@@ -474,6 +474,11 @@ async function main() {
     }
   });
 
+  // Admin dashboard page
+  app.get('/admin', (_req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
+  });
+
   // Health check
   app.get('/api/v1/health', (_req, res) => {
     res.json({ status: 'ok', version: '0.1.0' });
