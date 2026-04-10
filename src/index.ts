@@ -226,13 +226,16 @@ async function main() {
 
     const normalized = normalizeUrl(url);
 
-    // Rate limit: max 5 audits per email per week
-    const recentCount = countRecentAuditsByEmail(email);
-    if (recentCount >= 5) {
-      return res.status(429).json({
-        error: 'Has alcanzado el límite de 5 auditorías por semana.',
-        code: 'EMAIL_RATE_LIMIT',
-      });
+    // Rate limit: max 5 audits per email per week (whitelisted emails bypass)
+    const whitelistEmails = (process.env.WHITELIST_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
+    if (!whitelistEmails.includes(email.toLowerCase())) {
+      const recentCount = countRecentAuditsByEmail(email);
+      if (recentCount >= 5) {
+        return res.status(429).json({
+          error: 'Has alcanzado el límite de 5 auditorías por semana.',
+          code: 'EMAIL_RATE_LIMIT',
+        });
+      }
     }
 
     // Cache: reuse audit if this URL was analyzed in the last 7 days (skip with force=true)
