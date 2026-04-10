@@ -7,7 +7,7 @@ import { v4 as uuid } from 'uuid';
 import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
-import { createGroqProvider } from './services/groq.js';
+// Groq removed — all LLM calls now go through Gemini
 import { runPipeline } from './services/pipeline.js';
 import { generateReportHtml, DEFAULT_UI_STRINGS } from './services/report-generator.js';
 import { buildVerifyGate, DEFAULT_VERIFY_STRINGS } from './services/verify-gate.js';
@@ -213,16 +213,12 @@ async function main() {
 
   // Init LLM providers
   const geminiKey = process.env.GEMINI_API_KEY;
-  const groqKey = process.env.GROQ_API_KEY;
-
-  if (!geminiKey || !groqKey) {
-    console.error('ERROR: GEMINI_API_KEY and GROQ_API_KEY environment variables are required.');
-    console.error('Copy .env.example to .env and fill in your API keys.');
+  if (!geminiKey) {
+    console.error('ERROR: GEMINI_API_KEY environment variable is required.');
     process.exit(1);
   }
 
   const gemini = createGeminiProvider(geminiKey);
-  const groq = createGroqProvider(groqKey);
 
   // Init email service (reads RESEND_API_KEY from env; falls back to console.log)
   initEmail();
@@ -281,7 +277,7 @@ async function main() {
     });
 
     // Run audit in background
-    runAudit(auditId, url, gemini, groq).catch((err) => {
+    runAudit(auditId, url, gemini).catch((err) => {
       console.error(`Audit ${auditId} failed:`, err);
       updateAuditStatus(auditId, 'failed');
       saveDatabase(DB_PATH);
@@ -399,7 +395,7 @@ async function main() {
 
     let reportHtml: string;
     try {
-      reportHtml = await renderLocalizedReport(audit, lang, groq);
+      reportHtml = await renderLocalizedReport(audit, lang, gemini);
     } catch (err) {
       console.error(`[Report] Localized render failed for ${req.params.id}/${lang}:`, err);
       reportHtml = audit.report_html as string;
@@ -447,7 +443,7 @@ async function main() {
 
     // Generate fresh from the localised HTML.
     try {
-      const html = await renderLocalizedReport(audit, lang, groq);
+      const html = await renderLocalizedReport(audit, lang, gemini);
       const pdf = await generateReportPdf(html);
       storePdf(req.params.id, normalizedLang, pdf);
       saveDatabase(DB_PATH);
@@ -481,7 +477,7 @@ async function main() {
     } else {
       const mockWithPdf = { ...buildMockReportInput(), pdfUrl: `/preview/pdf?lang=${normalizedLang}` };
       try {
-        html = await translateAndRender(mockWithPdf, lang, groq);
+        html = await translateAndRender(mockWithPdf, lang, gemini);
       } catch (err) {
         console.error(`[Preview] Translation failed for lang=${lang}:`, err);
         html = generateReportHtml({ ...mockWithPdf, lang: normalizedLang });
@@ -497,7 +493,7 @@ async function main() {
   app.get('/preview/pdf', async (req, res) => {
     const lang = (req.query.lang as string) || 'es';
     try {
-      const html = await translateAndRender(buildMockReportInput(), lang, groq);
+      const html = await translateAndRender(buildMockReportInput(), lang, gemini);
       const pdf = await generateReportPdf(html);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${pdfFilename('https://example.com', normalizeLangCode(lang))}"`);
@@ -526,7 +522,6 @@ async function runAudit(
   auditId: string,
   url: string,
   gemini: ReturnType<typeof createGeminiProvider>,
-  groq: ReturnType<typeof createGroqProvider>,
 ) {
   let progress = auditProgress.get(auditId);
   if (!progress) {
@@ -550,7 +545,7 @@ async function runAudit(
   updateAuditStatus(auditId, 'analyzing');
   saveDatabase(DB_PATH);
 
-  const pipelineResult = await runPipeline(scrapingResult, url, gemini, groq, addMessage);
+  const pipelineResult = await runPipeline(scrapingResult, url, gemini, undefined, addMessage);
 
   // Step 3: Translate LLM results to Spanish (LLM responds in English for reliability)
   addMessage('Traduciendo resultados...');
@@ -559,7 +554,7 @@ async function runAudit(
     const translated = await translateReportData(
       { quickWins, mockups, analyses },
       'es',
-      groq,
+      gemini,
       true, // force: LLM responds in English, translate to Spanish
     );
     quickWins = translated.quickWins;

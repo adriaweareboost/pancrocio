@@ -27,7 +27,7 @@ export async function runPipeline(
   scrapingResult: ScrapingResult,
   url: string,
   gemini: LLMProvider,
-  groq: LLMProvider,
+  _groq?: LLMProvider, // deprecated: kept for backwards compat, uses gemini for everything
   onStatus?: (msg: string) => void,
 ): Promise<PipelineResult> {
   const pipelineStart = Date.now();
@@ -72,7 +72,7 @@ export async function runPipeline(
     (async () => {
       onStatus?.('  → Groq: analyzing copy, UX heuristics...');
       try {
-        const r = await withPipelineTimeout(runGroqConsolidated(scrapingResult.html, url, groq), 'Groq', 60000);
+        const r = await withPipelineTimeout(runGroqConsolidated(scrapingResult.html, url, gemini), 'Text analysis', 120000);
         onStatus?.('  ✓ Groq analysis done');
         return r;
       } catch (err) {
@@ -136,7 +136,7 @@ export async function runPipeline(
     onStatus?.('Generating wireframe mockup...');
     try {
       mockups = await withPipelineTimeout(
-        generateMockups(quickWins, url, gemini, scrapingResult.screenshotDesktop, onStatus, groq, scrapingResult.html),
+        generateMockups(quickWins, url, gemini, scrapingResult.screenshotDesktop, onStatus, gemini, scrapingResult.html),
         'Mockup',
         45000,
       );
