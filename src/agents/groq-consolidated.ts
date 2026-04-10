@@ -48,7 +48,7 @@ interface ConsolidatedResult {
 export async function runGroqConsolidated(
   html: string,
   url: string,
-  groq: LLMProvider,
+  llm: LLMProvider,
 ): Promise<ConsolidatedResult> {
   const start = Date.now();
 
@@ -85,7 +85,7 @@ Navigation/link texts: ${links}
 Page text content:
 ${textContent}`;
 
-  const parsed = await groq.generateJSON<{
+  const parsed = await llm.generateJSON<{
     copyMessaging: { score: number; findings: Finding[] };
     uxHeuristics: { score: number; findings: Finding[] };
   }>(fullPrompt);

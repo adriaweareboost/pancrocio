@@ -132,6 +132,6 @@ export interface LLMProvider {
   name: string;
   generateText(prompt: string): Promise<string>;
   generateWithImage(prompt: string, image: Buffer): Promise<string>;
-  generateJSON<T>(prompt: string, schema?: string): Promise<T>;
+  generateJSON<T>(prompt: string): Promise<T>;
 }
 

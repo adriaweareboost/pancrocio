@@ -1,10 +1,8 @@
-import type { AgentAnalysis, AgentInput, CategoryScores, QuickWin, Mockup, Score } from '../models/interfaces.js';
-import type { LLMProvider } from '../models/interfaces.js';
+import type { AgentAnalysis, AgentInput, CategoryScores, QuickWin, Mockup, Score, LLMProvider, ScrapingResult } from '../models/interfaces.js';
 import { runGeminiConsolidated } from '../agents/gemini-consolidated.js';
 import { runGroqConsolidated } from '../agents/groq-consolidated.js';
 import { createPerformanceAgent } from '../agents/performance.js';
 import { generateMockups } from '../agents/mockup-generator.js';
-import type { ScrapingResult } from '../models/interfaces.js';
 
 const CATEGORY_WEIGHTS: Record<keyof CategoryScores, number> = {
   visualHierarchy: 0.20,
@@ -27,7 +25,6 @@ export async function runPipeline(
   scrapingResult: ScrapingResult,
   url: string,
   gemini: LLMProvider,
-  _groq?: LLMProvider, // deprecated: kept for backwards compat, uses gemini for everything
   onStatus?: (msg: string) => void,
 ): Promise<PipelineResult> {
   const pipelineStart = Date.now();
@@ -40,7 +37,7 @@ export async function runPipeline(
     loadTimeMs: scrapingResult.loadTimeMs,
   };
 
-  onStatus?.('Running AI analysis (Gemini + Groq in parallel)...');
+  onStatus?.('Running AI analysis (parallel agents)...');
 
   // Timeout wrapper: fail gracefully after 60s per provider
   const withPipelineTimeout = <T>(promise: Promise<T>, label: string, ms = 60000): Promise<T> =>
@@ -52,7 +49,7 @@ export async function runPipeline(
       );
     });
 
-  // Run Gemini (vision) and Groq (text) in PARALLEL
+  // Run vision and text analysis agents in PARALLEL
   const [geminiResult, groqResult, perfResult] = await Promise.all([
     // 1 Gemini call: visual + trust + mobile
     (async () => {
@@ -70,14 +67,14 @@ export async function runPipeline(
 
     // 1 Groq call: copy + UX heuristics
     (async () => {
-      onStatus?.('  → Groq: analyzing copy, UX heuristics...');
+      onStatus?.('  → Text analysis: analyzing copy, UX heuristics...');
       try {
         const r = await withPipelineTimeout(runGroqConsolidated(scrapingResult.html, url, gemini), 'Text analysis', 120000);
-        onStatus?.('  ✓ Groq analysis done');
+        onStatus?.('  ✓ Text analysis done');
         return r;
       } catch (err) {
-        console.error('Groq consolidated failed:', err);
-        onStatus?.('  ✗ Groq analysis failed, using fallback scores');
+        console.error('Text analysis consolidated failed:', err);
+        onStatus?.('  ✗ Text analysis failed, using fallback scores');
         return null;
       }
     })(),

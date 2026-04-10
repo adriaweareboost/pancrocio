@@ -66,7 +66,7 @@ export async function generateMockups(
   gemini: LLMProvider,
   screenshotDesktop: Buffer,
   onStatus?: (msg: string) => void,
-  groqFallback?: LLMProvider,
+  fallbackLlm?: LLMProvider,
   html?: string,
 ): Promise<Mockup[]> {
   // Try to get page description from Gemini (vision), fallback to HTML parsing
@@ -92,15 +92,15 @@ export async function generateMockups(
 
       const prompt = buildMockupPrompt(qw, url, pageDescription);
 
-      // Try Gemini first, fallback to Groq
+      // Try primary LLM first, fallback to secondary
       let htmlContent: string;
       try {
         htmlContent = await gemini.generateText(prompt);
       } catch {
-        if (groqFallback) {
-          console.log('[Mockup] Gemini text failed, using Groq fallback');
-          onStatus?.('  → Switching to Groq for wireframe...');
-          htmlContent = await groqFallback.generateText(prompt);
+        if (fallbackLlm) {
+          console.log('[Mockup] Primary LLM failed, using fallback');
+          onStatus?.('  → Switching to fallback LLM for wireframe...');
+          htmlContent = await fallbackLlm.generateText(prompt);
         } else {
           throw new Error('Gemini failed and no fallback available');
         }

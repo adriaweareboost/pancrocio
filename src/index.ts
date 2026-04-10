@@ -7,13 +7,11 @@ import { v4 as uuid } from 'uuid';
 import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
-// Groq removed — all LLM calls now go through Gemini
 import { runPipeline } from './services/pipeline.js';
 import { generateReportHtml, DEFAULT_UI_STRINGS } from './services/report-generator.js';
-import { buildVerifyGate, DEFAULT_VERIFY_STRINGS } from './services/verify-gate.js';
 import { generateReportPdf, pdfFilename } from './services/pdf.js';
 import { initEmail, sendVerifyCodeEmail, sendReportEmail, sendLeadNotification } from './services/email.js';
-import { parseAcceptLanguage, shouldTranslate, normalizeLangCode, translateReportData, translateUiStrings, translateVerifyStrings } from './agents/translator.js';
+import { shouldTranslate, normalizeLangCode, translateReportData, translateUiStrings } from './agents/translator.js';
 import type { LLMProvider, AgentAnalysis, QuickWin, Mockup, CategoryScores } from './models/interfaces.js';
 import { normalizeUrl, isValidUrl, isValidEmail } from './utils/normalize-url.js';
 import { auditRateLimit, generalRateLimit, honeypotCheck, securityHeaders, corsProtection, hashEmail } from './services/security.js';
@@ -39,9 +37,6 @@ const auditProgress = new Map<string, { status: string; messages: string[]; crea
 const REPORT_CACHE_TTL_MS = 60 * 60 * 1000;
 const reportCache = new Map<string, { html: string; createdAt: number }>();
 
-// In-memory verify-gate translation cache (key: lang, no TTL — strings rarely change)
-const verifyStringsCache = new Map<string, typeof DEFAULT_VERIFY_STRINGS>();
-
 // In-memory report UI strings translation cache (key: lang, no TTL)
 const uiStringsCache = new Map<string, typeof DEFAULT_UI_STRINGS>();
 
@@ -60,22 +55,6 @@ async function getCachedUiStrings(lang: string, llm: LLMProvider): Promise<typeo
   }
 }
 
-async function getLocalizedVerifyGate(lang: string, llm: LLMProvider): Promise<string> {
-  const normalized = normalizeLangCode(lang);
-  if (!shouldTranslate(normalized)) return buildVerifyGate(DEFAULT_VERIFY_STRINGS);
-
-  let strings = verifyStringsCache.get(normalized);
-  if (!strings) {
-    try {
-      strings = await translateVerifyStrings(DEFAULT_VERIFY_STRINGS, normalized, llm);
-      verifyStringsCache.set(normalized, strings);
-    } catch (err) {
-      console.error(`[VerifyGate] Translation failed for lang=${normalized}:`, err);
-      strings = DEFAULT_VERIFY_STRINGS;
-    }
-  }
-  return buildVerifyGate(strings);
-}
 
 function getCachedReport(key: string): string | null {
   const entry = reportCache.get(key);
@@ -549,7 +528,7 @@ async function runAudit(
   updateAuditStatus(auditId, 'analyzing');
   saveDatabase(DB_PATH);
 
-  const pipelineResult = await runPipeline(scrapingResult, url, gemini, undefined, addMessage);
+  const pipelineResult = await runPipeline(scrapingResult, url, gemini, addMessage);
 
   // Step 3: Translate LLM results to Spanish (LLM responds in English for reliability)
   addMessage('Traduciendo resultados...');
@@ -667,7 +646,7 @@ function buildMockReportInput() {
 function buildVerifyPage(auditId: string, url: string, score: number | null, lang = 'es'): string {
   const scoreDisplay = score !== null ? `<div style="margin-top:16px"><span style="font-size:48px;font-weight:800;color:#EC5F29">${score}</span><span style="font-size:18px;color:#9ca3af">/100</span></div>` : '';
   return `<!DOCTYPE html>
-<html lang="es">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
