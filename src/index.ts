@@ -215,7 +215,8 @@ async function main() {
 
   // Submit audit (rate limited: 5/hour/IP, honeypot protected)
   app.post('/api/v1/audit', auditRateLimit, honeypotCheck, async (req, res) => {
-    const { email, url } = req.body;
+    const { email, url, lang: requestLang } = req.body;
+    const auditLang = normalizeLangCode(requestLang || 'es');
 
     if (!email || !isValidEmail(email)) {
       return res.status(400).json({ error: 'Valid email is required', code: 'INVALID_EMAIL' });
@@ -297,7 +298,7 @@ async function main() {
     });
 
     // Run audit in background
-    runAudit(auditId, url, gemini).catch((err) => {
+    runAudit(auditId, url, gemini, auditLang).catch((err) => {
       console.error(`Audit ${auditId} failed:`, err);
       updateAuditStatus(auditId, 'failed');
       saveDatabase(DB_PATH);
@@ -410,16 +411,9 @@ async function main() {
       return res.status(202).json({ error: 'Audit still in progress', code: 'AUDIT_IN_PROGRESS', status: audit.status });
     }
 
-    // Detect target language: ?lang= query param overrides Accept-Language header.
-    const lang = (req.query.lang as string) || 'es';
-
-    let reportHtml: string;
-    try {
-      reportHtml = await renderLocalizedReport(audit, lang, gemini);
-    } catch (err) {
-      console.error(`[Report] Localized render failed for ${req.params.id}/${lang}:`, err);
-      reportHtml = audit.report_html as string;
-    }
+    // Report is served in the language it was generated with (no on-the-fly translation)
+    const reportHtml = audit.report_html as string;
+    const reportLang = (req.query.lang as string) || 'es';
 
     const verified = isEmailVerified(req.params.id);
 
@@ -427,9 +421,8 @@ async function main() {
       res.setHeader('Content-Type', 'text/html');
       res.send(reportHtml);
     } else {
-      // Serve a clean verification page instead of blurred overlay
       const auditId = req.params.id;
-      const verifyPageHtml = buildVerifyPage(auditId, audit.url as string, audit.global_score as number, lang);
+      const verifyPageHtml = buildVerifyPage(auditId, audit.url as string, audit.global_score as number, reportLang);
       res.setHeader('Content-Type', 'text/html');
       res.send(verifyPageHtml);
     }
@@ -553,6 +546,7 @@ async function runAudit(
   auditId: string,
   url: string,
   gemini: ReturnType<typeof createGeminiProvider>,
+  lang = 'es',
 ) {
   let progress = auditProgress.get(auditId);
   if (!progress) {
@@ -578,21 +572,23 @@ async function runAudit(
 
   const pipelineResult = await runPipeline(scrapingResult, url, gemini, addMessage);
 
-  // Step 3: Translate LLM results to Spanish (LLM responds in English for reliability)
-  addMessage('Traduciendo resultados...');
+  // Step 3: Translate LLM results if target lang is not English
   let { quickWins, mockups, analyses } = pipelineResult;
-  try {
-    const translated = await translateReportData(
-      { quickWins, mockups, analyses },
-      'es',
-      gemini,
-      true, // force: LLM responds in English, translate to Spanish
-    );
-    quickWins = translated.quickWins;
-    mockups = translated.mockups;
-    analyses = translated.analyses;
-  } catch (err) {
-    console.warn('[Audit] Translation to Spanish failed, using English results:', (err as Error).message);
+  if (lang !== 'en') {
+    addMessage('Traduciendo resultados...');
+    try {
+      const translated = await translateReportData(
+        { quickWins, mockups, analyses },
+        lang,
+        gemini,
+        true, // force: LLM responds in English, translate to target lang
+      );
+      quickWins = translated.quickWins;
+      mockups = translated.mockups;
+      analyses = translated.analyses;
+    } catch (err) {
+      console.warn(`[Audit] Translation to ${lang} failed, using English results:`, (err as Error).message);
+    }
   }
 
   // Step 4: Generate report
@@ -608,8 +604,8 @@ async function runAudit(
     mockups,
     analyses,
     date: new Date().toISOString().split('T')[0],
-    lang: 'es',
-    pdfUrl: `/api/v1/audit/${auditId}/pdf?lang=es`,
+    lang,
+    pdfUrl: `/api/v1/audit/${auditId}/pdf?lang=${lang}`,
   });
 
   // Step 4: Save

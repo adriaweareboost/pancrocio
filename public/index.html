@@ -734,7 +734,7 @@
         const res = await fetch('/api/v1/audit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, url, website: honeypot }),
+          body: JSON.stringify({ email, url, lang: currentLang, website: honeypot }),
         });
 
         const data = await res.json();
