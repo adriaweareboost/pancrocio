@@ -159,6 +159,15 @@ export function getLeadStats(): { total: number; verified: number; completed: nu
   };
 }
 
+export function purgeAllAudits(): number {
+  db.run(`DELETE FROM audit_pdfs`);
+  db.run(`DELETE FROM audit_translations`);
+  db.run(`DELETE FROM audits`);
+  db.run(`DELETE FROM leads`);
+  const result = db.exec(`SELECT changes()`);
+  return (result[0]?.values[0]?.[0] as number) || 0;
+}
+
 export function linkLeadToAudit(leadId: string, auditId: string): void {
   db.run(`UPDATE leads SET audit_id = ? WHERE id = ?`, [auditId, leadId]);
 }
