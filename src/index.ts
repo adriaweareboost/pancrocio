@@ -23,7 +23,11 @@ app.use(securityHeaders);
 app.use(corsProtection);
 app.use(express.json({ limit: '1mb' })); // limit body size
 app.use(express.static(path.join(__dirname, '..', 'public')));
-app.use('/api/', generalRateLimit);
+// Rate limit all API routes except admin
+app.use('/api/', (req, res, next) => {
+  if (req.path.startsWith('/v1/admin/')) return next();
+  return generalRateLimit(req, res, next);
+});
 
 const PORT = process.env.PORT || 3000;
 const SITE_ORIGIN = (process.env.SITE_ORIGIN || 'https://pancrocio-production.up.railway.app').replace(/\/$/, '');
@@ -581,6 +585,16 @@ async function runAudit(
   saveDatabase(DB_PATH);
 
   const pipelineResult = await runPipeline(scrapingResult, url, gemini, addMessage);
+
+  // Check if we got meaningful results (at least 2 categories beyond Performance)
+  const realCategories = pipelineResult.analyses.filter(a => a.category !== 'performance').length;
+  if (realCategories === 0) {
+    addMessage('Analysis failed — no LLM results. Try again later.');
+    updateAuditStatus(auditId, 'failed');
+    saveDatabase(DB_PATH);
+    progress.status = 'failed';
+    return;
+  }
 
   // Step 3: Translate LLM results if target lang is not English
   let { quickWins, mockups, analyses } = pipelineResult;
