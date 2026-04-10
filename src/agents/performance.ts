@@ -16,28 +16,28 @@ export function createPerformanceAgent(): CROAgent {
       if (loadTime > 5000) {
         score -= 30;
         findings.push({
-          title: 'Carga de página muy lenta',
-          description: `La página tardó ${(loadTime / 1000).toFixed(1)}s en cargar. Los usuarios abandonan tras 3 segundos.`,
+          title: 'Very slow page load',
+          description: `Page took ${(loadTime / 1000).toFixed(1)}s to load. Users abandon pages after 3 seconds.`,
           severity: 'critical',
-          element: 'Página completa',
-          recommendation: 'Optimizar imágenes, minimizar JS/CSS, activar compresión, usar CDN.',
+          element: 'Full page',
+          recommendation: 'Optimize images, minimize JS/CSS, enable compression, use CDN.',
         });
       } else if (loadTime > 3000) {
         score -= 15;
         findings.push({
-          title: 'Carga de página lenta',
-          description: `La página tardó ${(loadTime / 1000).toFixed(1)}s en cargar.`,
+          title: 'Slow page load',
+          description: `Page took ${(loadTime / 1000).toFixed(1)}s to load.`,
           severity: 'warning',
-          element: 'Página completa',
-          recommendation: 'Objetivo: menos de 3s. Optimizar imágenes, lazy load del contenido below the fold.',
+          element: 'Full page',
+          recommendation: 'Target under 3s: optimize images, lazy load below-the-fold content.',
         });
       } else {
         findings.push({
-          title: 'Buen tiempo de carga',
-          description: `La página cargó en ${(loadTime / 1000).toFixed(1)}s.`,
+          title: 'Good load time',
+          description: `Page loaded in ${(loadTime / 1000).toFixed(1)}s.`,
           severity: 'info',
-          element: 'Página completa',
-          recommendation: 'El tiempo de carga es aceptable. Monitorizar con Core Web Vitals.',
+          element: 'Full page',
+          recommendation: 'Load time is acceptable. Monitor with Core Web Vitals.',
         });
       }
 
@@ -46,11 +46,11 @@ export function createPerformanceAgent(): CROAgent {
       if (htmlSize > 300_000) {
         score -= 15;
         findings.push({
-          title: 'Documento HTML pesado',
-          description: `El HTML pesa ${(htmlSize / 1024).toFixed(0)}KB. Un HTML grande aumenta el tiempo de parseo.`,
+          title: 'Heavy HTML document',
+          description: `HTML is ${(htmlSize / 1024).toFixed(0)}KB. Large HTML increases parse time.`,
           severity: 'warning',
-          element: 'Documento HTML',
-          recommendation: 'Eliminar código no usado, solo inline CSS crítico, diferir recursos no críticos.',
+          element: 'HTML document',
+          recommendation: 'Remove unused code, inline critical CSS only, defer non-critical resources.',
         });
       }
 
@@ -60,11 +60,11 @@ export function createPerformanceAgent(): CROAgent {
       if (imgCount > 5 && lazyCount < imgCount / 2) {
         score -= 10;
         findings.push({
-          title: 'Imágenes sin lazy loading',
-          description: `Se encontraron ${imgCount} imágenes pero solo ${lazyCount} usan lazy loading.`,
+          title: 'Images not lazy-loaded',
+          description: `Found ${imgCount} images but only ${lazyCount} use lazy loading.`,
           severity: 'warning',
-          element: 'Imágenes',
-          recommendation: `Añadir loading="lazy" a las imágenes below the fold (${imgCount - lazyCount} imágenes).`,
+          element: 'Images',
+          recommendation: `Add loading="lazy" to images below the fold (${imgCount - lazyCount} images).`,
         });
       }
 
@@ -72,11 +72,11 @@ export function createPerformanceAgent(): CROAgent {
       if (!input.html.includes('viewport')) {
         score -= 20;
         findings.push({
-          title: 'Falta meta tag viewport',
-          description: 'No se encontró meta tag viewport. Crítico para el renderizado móvil.',
+          title: 'Missing viewport meta tag',
+          description: 'No viewport meta tag found. Critical for mobile rendering.',
           severity: 'critical',
           element: '<head>',
-          recommendation: 'Añadir <meta name="viewport" content="width=device-width, initial-scale=1">',
+          recommendation: 'Add <meta name="viewport" content="width=device-width, initial-scale=1">',
         });
       }
 

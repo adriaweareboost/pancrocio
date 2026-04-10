@@ -604,7 +604,7 @@ async function runAudit(
   // Step 3: Translate LLM results if target lang is not English
   let { quickWins, mockups, analyses } = pipelineResult;
   if (lang !== 'en') {
-    addMessage('Traduciendo resultados...');
+    addMessage('Translating results...');
     try {
       const translated = await translateReportData(
         { quickWins, mockups, analyses },
@@ -621,7 +621,7 @@ async function runAudit(
   }
 
   // Step 4: Translate UI strings if not Spanish, then generate report
-  addMessage('Generando informe...');
+  addMessage('Generating report...');
   updateAuditStatus(auditId, 'generating_report');
   saveDatabase(DB_PATH);
 
