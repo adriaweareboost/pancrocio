@@ -162,7 +162,9 @@ function extractQuickWins(analyses: AgentAnalysis[]): QuickWin[] {
       if (finding.severity === 'info') continue;
 
       const impact = finding.severity === 'critical' ? 'high' : 'medium';
-      const effort: QuickWin['effort'] = 'low';
+      // Estimate effort from recommendation complexity
+      const recLen = (finding.recommendation || '').length;
+      const effort: QuickWin['effort'] = recLen > 200 ? 'high' : recLen > 80 ? 'medium' : 'low';
       const priorityScore =
         (impact === 'high' ? 3 : impact === 'medium' ? 2 : 1) *
         (effort === 'low' ? 3 : effort === 'medium' ? 2 : 1);

@@ -99,6 +99,70 @@ export async function saveDatabase(dbPath: string): Promise<void> {
   }
 }
 
+// ─── Rate limiting by email (max 5 audits per 7 days) ───
+
+export function countRecentAuditsByEmail(email: string, days = 7): number {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const result = db.exec(
+    `SELECT COUNT(*) FROM leads l JOIN audits a ON l.audit_id = a.id WHERE l.email = ? AND a.created_at > ?`,
+    [email, since],
+  );
+  if (result.length === 0 || result[0].values.length === 0) return 0;
+  return result[0].values[0][0] as number;
+}
+
+// ─── Audit cache by URL (reuse if < 7 days old) ───
+
+export function getRecentAuditByUrl(normalizedUrl: string, days = 7): Record<string, unknown> | null {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const result = db.exec(
+    `SELECT * FROM audits WHERE normalized_url = ? AND status = 'completed' AND completed_at > ? ORDER BY completed_at DESC LIMIT 1`,
+    [normalizedUrl, since],
+  );
+  if (result.length === 0 || result[0].values.length === 0) return null;
+  const columns = result[0].columns;
+  const values = result[0].values[0];
+  const row: Record<string, unknown> = {};
+  columns.forEach((col: string, i: number) => { row[col] = values[i]; });
+  return row;
+}
+
+// ─── Dashboard / admin queries ───
+
+export function getAllLeads(limit = 50): Record<string, unknown>[] {
+  const result = db.exec(
+    `SELECT l.id, l.email, l.url, l.created_at, l.email_verified, l.audit_id,
+            a.status AS audit_status, a.global_score, a.normalized_url
+       FROM leads l
+       LEFT JOIN audits a ON l.audit_id = a.id
+      ORDER BY l.created_at DESC
+      LIMIT ?`,
+    [limit],
+  );
+  if (result.length === 0) return [];
+  const columns = result[0].columns;
+  return result[0].values.map((row) => {
+    const obj: Record<string, unknown> = {};
+    columns.forEach((col, i) => { obj[col] = row[i]; });
+    return obj;
+  });
+}
+
+export function getLeadStats(): { total: number; verified: number; completed: number } {
+  const r1 = db.exec(`SELECT COUNT(*) FROM leads`);
+  const r2 = db.exec(`SELECT COUNT(*) FROM leads WHERE email_verified = 1`);
+  const r3 = db.exec(`SELECT COUNT(*) FROM audits WHERE status = 'completed'`);
+  return {
+    total: (r1[0]?.values[0]?.[0] as number) || 0,
+    verified: (r2[0]?.values[0]?.[0] as number) || 0,
+    completed: (r3[0]?.values[0]?.[0] as number) || 0,
+  };
+}
+
+export function linkLeadToAudit(leadId: string, auditId: string): void {
+  db.run(`UPDATE leads SET audit_id = ? WHERE id = ?`, [auditId, leadId]);
+}
+
 export function createLead(id: string, email: string, url: string): void {
   db.run(
     `INSERT INTO leads (id, email, url, created_at) VALUES (?, ?, ?, ?)`,

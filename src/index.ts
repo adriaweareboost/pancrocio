@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf } from './services/database.js';
+import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
 import { runPipeline } from './services/pipeline.js';
@@ -226,7 +226,40 @@ async function main() {
 
     const normalized = normalizeUrl(url);
 
-    // Remove previous audit for this URL if it exists (allows re-audit)
+    // Rate limit: max 5 audits per email per week
+    const recentCount = countRecentAuditsByEmail(email);
+    if (recentCount >= 5) {
+      return res.status(429).json({
+        error: 'Has alcanzado el límite de 5 auditorías por semana.',
+        code: 'EMAIL_RATE_LIMIT',
+      });
+    }
+
+    // Cache: reuse audit if this URL was analyzed in the last 7 days
+    const cachedAudit = getRecentAuditByUrl(normalized);
+    if (cachedAudit) {
+      const cachedLeadId = uuid();
+      const cachedCode = String(crypto.randomInt(100000, 999999));
+      createLead(cachedLeadId, email, url);
+      linkLeadToAudit(cachedLeadId, cachedAudit.id as string);
+      setVerifyCode(cachedLeadId, cachedCode);
+      saveDatabase(DB_PATH);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[Cache] Reusing audit ${cachedAudit.id} for ${url} — code: ${cachedCode}`);
+      } else {
+        console.log(`[Cache] Reusing audit ${cachedAudit.id} for ${url} — ${hashEmail(email)}`);
+      }
+      sendVerifyCodeEmail(email, cachedCode).catch(() => {});
+      sendLeadNotification(email, url, cachedAudit.global_score as number, cachedAudit.id as string).catch(() => {});
+      return res.status(201).json({
+        auditId: cachedAudit.id,
+        status: 'completed',
+        message: 'Report ready (cached).',
+        cached: true,
+      });
+    }
+
+    // No cache — remove stale audit and run fresh
     deleteAuditByUrl(normalized);
 
     const leadId = uuid();
@@ -444,6 +477,17 @@ async function main() {
   // Health check
   app.get('/api/v1/health', (_req, res) => {
     res.json({ status: 'ok', version: '0.1.0' });
+  });
+
+  // Admin dashboard API (protected by ADMIN_KEY env var)
+  app.get('/api/v1/admin/leads', (req, res) => {
+    const adminKey = process.env.ADMIN_KEY;
+    if (!adminKey || req.query.key !== adminKey) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const stats = getLeadStats();
+    const leads = getAllLeads(100);
+    res.json({ stats, leads });
   });
 
   // Preview report with mock data (for UI/CSS testing — no DB, no verify gate).
