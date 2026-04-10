@@ -294,15 +294,39 @@
     }
     .footer a { color: #EC5F29; text-decoration: none; }
     .footer a:hover { text-decoration: underline; }
+
+    /* Language selector */
+    .lang-selector {
+      position: absolute; top: 12px; right: 16px; z-index: 10;
+    }
+    .lang-selector select {
+      background: rgba(255,255,255,0.12); color: white; border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 8px; padding: 6px 10px; font-size: 13px; font-family: inherit;
+      cursor: pointer; outline: none; appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 8px center; padding-right: 28px;
+    }
+    .lang-selector select:hover { background: rgba(255,255,255,0.2); }
+    .lang-selector select option { background: #070F2D; color: white; }
   </style>
 </head>
 <body>
-  <div class="hero">
+  <div class="hero" style="position:relative">
+    <div class="lang-selector">
+      <select id="langSelect" aria-label="Language">
+        <option value="es">ES</option>
+        <option value="en">EN</option>
+        <option value="fr">FR</option>
+        <option value="de">DE</option>
+        <option value="it">IT</option>
+        <option value="pt">PT</option>
+      </select>
+    </div>
     <div style="margin-bottom:16px">
       <img src="/pancrocio.svg" alt="PanCROcio" width="120" height="144" style="filter:drop-shadow(0 4px 12px rgba(0,0,0,0.3))">
     </div>
     <h1>Pan<span>CRO</span>cio</h1>
-    <p>Tu analista CRO con IA. Consigue una auditoría CRO gratuita de tu web en minutos. Descubre quick wins para mejorar tu conversión.</p>
+    <p data-i18n="heroSubtitle">Tu analista CRO con IA. Consigue una auditoría CRO gratuita de tu web en minutos. Descubre quick wins para mejorar tu conversión.</p>
   </div>
 
   <div class="landing-layout">
@@ -310,13 +334,13 @@
   <div class="features-left">
     <div class="feature">
       <div class="feature-icon">&#x1f50d;</div>
-      <h3>Análisis Visual</h3>
-      <p>IA analiza tu layout, CTAs y jerarquía visual</p>
+      <h3 data-i18n="feat1Title">Análisis Visual</h3>
+      <p data-i18n="feat1Desc">IA analiza tu layout, CTAs y jerarquía visual</p>
     </div>
     <div class="feature">
       <div class="feature-icon">&#x1f4dd;</div>
-      <h3>Revisión de Copy</h3>
-      <p>Titulares, propuesta de valor y efectividad de CTAs</p>
+      <h3 data-i18n="feat2Title">Revisión de Copy</h3>
+      <p data-i18n="feat2Desc">Titulares, propuesta de valor y efectividad de CTAs</p>
     </div>
   </div>
 
@@ -326,14 +350,14 @@
 
     <form id="auditForm">
       <div class="form-group">
-        <label for="email">Tu Email</label>
-        <input type="email" id="email" placeholder="you@company.com" required>
+        <label for="email" data-i18n="emailLabel">Tu Email</label>
+        <input type="email" id="email" data-i18n-placeholder="emailPlaceholder" placeholder="you@company.com" required>
       </div>
       <div class="form-group">
-        <label for="url">URL de tu web</label>
+        <label for="url" data-i18n="urlLabel">URL de tu web</label>
         <input type="url" id="url" placeholder="https://yoursite.com" required>
       </div>
-      <button type="submit" class="submit-btn" id="submitBtn">Analizar mi web</button>
+      <button type="submit" class="submit-btn" id="submitBtn" data-i18n="submitBtn">Analizar mi web</button>
     </form>
 
     <div class="progress-section" id="progressSection">
@@ -365,22 +389,154 @@
   <div class="features-right">
     <div class="feature">
       <div class="feature-icon">&#x1f4f1;</div>
-      <h3>Check Mobile</h3>
-      <p>Touch targets, diseño responsive y UX móvil</p>
+      <h3 data-i18n="feat3Title">Check Mobile</h3>
+      <p data-i18n="feat3Desc">Touch targets, diseño responsive y UX móvil</p>
     </div>
     <div class="feature">
       <div class="feature-icon">&#x1f6e1;</div>
-      <h3>Trust Signals</h3>
-      <p>Social proof, garantías y elementos de credibilidad</p>
+      <h3 data-i18n="feat4Title">Trust Signals</h3>
+      <p data-i18n="feat4Desc">Social proof, garantías y elementos de credibilidad</p>
     </div>
   </div>
   </div> <!-- /landing-layout -->
 
   <div class="footer">
-    Powered by <a href="https://www.weareboost.online" target="_blank" rel="noopener">Boost</a> &middot; PanCROcio &mdash; Optimización de conversión con IA
+    Powered by <a href="https://www.weareboost.online" target="_blank" rel="noopener">Boost</a> &middot; PanCROcio &mdash; <span data-i18n="footerTagline">Optimización de conversión con IA</span>
   </div>
 
   <script>
+    // ─── i18n translations ───
+    const LANG_STRINGS = {
+      es: {
+        heroSubtitle: 'Tu analista CRO con IA. Consigue una auditoría CRO gratuita de tu web en minutos. Descubre quick wins para mejorar tu conversión.',
+        feat1Title: 'Análisis Visual', feat1Desc: 'IA analiza tu layout, CTAs y jerarquía visual',
+        feat2Title: 'Revisión de Copy', feat2Desc: 'Titulares, propuesta de valor y efectividad de CTAs',
+        feat3Title: 'Check Mobile', feat3Desc: 'Touch targets, diseño responsive y UX móvil',
+        feat4Title: 'Trust Signals', feat4Desc: 'Social proof, garantías y elementos de credibilidad',
+        emailLabel: 'Tu Email', emailPlaceholder: 'tu@empresa.com',
+        urlLabel: 'URL de tu web', submitBtn: 'Analizar mi web',
+        footerTagline: 'Optimización de conversión con IA',
+        analyzing: 'Analizando...', starting: 'Iniciando auditoría...',
+        errorBoth: 'Rellena ambos campos.', errorConn: 'Error de conexión. El servidor no responde.',
+        errorFailed: 'La auditoría ha fallado. Inténtalo de nuevo.',
+        reportReady: '¡Tu informe CRO está listo!', reportReadyDesc: 'Baja para ver tu informe personalizado de optimización de conversión con quick wins accionables.',
+        agentsLabel: 'agentes IA', approx: 'aprox.', timeLabel: 'Tiempo',
+        techDetails: 'Detalles técnicos', agentsReady: 'agentes listos', reportDone: 'Informe listo!',
+      },
+      en: {
+        heroSubtitle: 'Your AI CRO analyst. Get a free CRO audit of your website in minutes. Discover quick wins to improve your conversion.',
+        feat1Title: 'Visual Analysis', feat1Desc: 'AI analyzes your layout, CTAs and visual hierarchy',
+        feat2Title: 'Copy Review', feat2Desc: 'Headlines, value proposition and CTA effectiveness',
+        feat3Title: 'Mobile Check', feat3Desc: 'Touch targets, responsive design and mobile UX',
+        feat4Title: 'Trust Signals', feat4Desc: 'Social proof, guarantees and credibility elements',
+        emailLabel: 'Your Email', emailPlaceholder: 'you@company.com',
+        urlLabel: 'Your website URL', submitBtn: 'Analyze my site',
+        footerTagline: 'AI-powered conversion optimization',
+        analyzing: 'Analyzing...', starting: 'Starting audit...',
+        errorBoth: 'Fill in both fields.', errorConn: 'Connection error. Server not responding.',
+        errorFailed: 'The audit failed. Please try again.',
+        reportReady: 'Your CRO report is ready!', reportReadyDesc: 'Scroll down to see your personalized conversion optimization report with actionable quick wins.',
+        agentsLabel: 'AI agents', approx: 'est.', timeLabel: 'Elapsed',
+        techDetails: 'Technical details', agentsReady: 'agents ready', reportDone: 'Report ready!',
+      },
+      fr: {
+        heroSubtitle: 'Votre analyste CRO IA. Obtenez un audit CRO gratuit de votre site en quelques minutes. Découvrez les quick wins pour améliorer votre conversion.',
+        feat1Title: 'Analyse Visuelle', feat1Desc: "L'IA analyse votre layout, CTAs et hiérarchie visuelle",
+        feat2Title: 'Révision du Copy', feat2Desc: 'Titres, proposition de valeur et efficacité des CTAs',
+        feat3Title: 'Check Mobile', feat3Desc: 'Touch targets, design responsive et UX mobile',
+        feat4Title: 'Signaux de Confiance', feat4Desc: 'Preuve sociale, garanties et éléments de crédibilité',
+        emailLabel: 'Votre Email', emailPlaceholder: 'vous@entreprise.com',
+        urlLabel: 'URL de votre site', submitBtn: 'Analyser mon site',
+        footerTagline: "Optimisation de conversion par l'IA",
+        analyzing: 'Analyse en cours...', starting: "Démarrage de l'audit...",
+        errorBoth: 'Remplissez les deux champs.', errorConn: 'Erreur de connexion. Le serveur ne répond pas.',
+        errorFailed: "L'audit a échoué. Veuillez réessayer.",
+        reportReady: 'Votre rapport CRO est prêt !', reportReadyDesc: 'Descendez pour voir votre rapport personnalisé avec des quick wins actionnables.',
+        agentsLabel: 'agents IA', approx: 'env.', timeLabel: 'Temps',
+        techDetails: 'Détails techniques', agentsReady: 'agents prêts', reportDone: 'Rapport prêt !',
+      },
+      de: {
+        heroSubtitle: 'Ihr KI-CRO-Analyst. Erhalten Sie in wenigen Minuten ein kostenloses CRO-Audit Ihrer Website. Entdecken Sie Quick Wins zur Verbesserung Ihrer Conversion.',
+        feat1Title: 'Visuelle Analyse', feat1Desc: 'KI analysiert Ihr Layout, CTAs und visuelle Hierarchie',
+        feat2Title: 'Copy-Review', feat2Desc: 'Überschriften, Wertversprechen und CTA-Effektivität',
+        feat3Title: 'Mobile Check', feat3Desc: 'Touch Targets, Responsive Design und Mobile UX',
+        feat4Title: 'Vertrauenssignale', feat4Desc: 'Social Proof, Garantien und Glaubwürdigkeitselemente',
+        emailLabel: 'Ihre E-Mail', emailPlaceholder: 'sie@firma.de',
+        urlLabel: 'URL Ihrer Website', submitBtn: 'Meine Seite analysieren',
+        footerTagline: 'KI-gestützte Conversion-Optimierung',
+        analyzing: 'Analyse läuft...', starting: 'Audit wird gestartet...',
+        errorBoth: 'Bitte füllen Sie beide Felder aus.', errorConn: 'Verbindungsfehler. Server antwortet nicht.',
+        errorFailed: 'Das Audit ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
+        reportReady: 'Ihr CRO-Bericht ist fertig!', reportReadyDesc: 'Scrollen Sie nach unten, um Ihren personalisierten Bericht mit umsetzbaren Quick Wins zu sehen.',
+        agentsLabel: 'KI-Agenten', approx: 'ca.', timeLabel: 'Zeit',
+        techDetails: 'Technische Details', agentsReady: 'Agenten fertig', reportDone: 'Bericht fertig!',
+      },
+      it: {
+        heroSubtitle: 'Il tuo analista CRO con IA. Ottieni un audit CRO gratuito del tuo sito in pochi minuti. Scopri i quick win per migliorare la tua conversione.',
+        feat1Title: 'Analisi Visiva', feat1Desc: "L'IA analizza il tuo layout, CTA e gerarchia visiva",
+        feat2Title: 'Revisione Copy', feat2Desc: 'Titoli, proposta di valore ed efficacia dei CTA',
+        feat3Title: 'Check Mobile', feat3Desc: 'Touch target, design responsive e UX mobile',
+        feat4Title: 'Segnali di Fiducia', feat4Desc: 'Prova sociale, garanzie ed elementi di credibilità',
+        emailLabel: 'La tua Email', emailPlaceholder: 'tu@azienda.it',
+        urlLabel: 'URL del tuo sito', submitBtn: 'Analizza il mio sito',
+        footerTagline: "Ottimizzazione della conversione con l'IA",
+        analyzing: 'Analisi in corso...', starting: "Avvio dell'audit...",
+        errorBoth: 'Compila entrambi i campi.', errorConn: 'Errore di connessione. Il server non risponde.',
+        errorFailed: "L'audit è fallito. Riprova.",
+        reportReady: 'Il tuo report CRO è pronto!', reportReadyDesc: 'Scorri verso il basso per vedere il tuo report personalizzato con quick win attuabili.',
+        agentsLabel: 'agenti IA', approx: 'circa', timeLabel: 'Tempo',
+        techDetails: 'Dettagli tecnici', agentsReady: 'agenti pronti', reportDone: 'Report pronto!',
+      },
+      pt: {
+        heroSubtitle: 'Seu analista CRO com IA. Obtenha uma auditoria CRO gratuita do seu site em minutos. Descubra quick wins para melhorar sua conversão.',
+        feat1Title: 'Análise Visual', feat1Desc: 'IA analisa seu layout, CTAs e hierarquia visual',
+        feat2Title: 'Revisão de Copy', feat2Desc: 'Títulos, proposta de valor e eficácia dos CTAs',
+        feat3Title: 'Check Mobile', feat3Desc: 'Touch targets, design responsivo e UX móvel',
+        feat4Title: 'Sinais de Confiança', feat4Desc: 'Prova social, garantias e elementos de credibilidade',
+        emailLabel: 'Seu Email', emailPlaceholder: 'voce@empresa.com',
+        urlLabel: 'URL do seu site', submitBtn: 'Analisar meu site',
+        footerTagline: 'Otimização de conversão com IA',
+        analyzing: 'Analisando...', starting: 'Iniciando auditoria...',
+        errorBoth: 'Preencha ambos os campos.', errorConn: 'Erro de conexão. Servidor não responde.',
+        errorFailed: 'A auditoria falhou. Tente novamente.',
+        reportReady: 'Seu relatório CRO está pronto!', reportReadyDesc: 'Role para baixo para ver seu relatório personalizado com quick wins acionáveis.',
+        agentsLabel: 'agentes IA', approx: 'aprox.', timeLabel: 'Tempo',
+        techDetails: 'Detalhes técnicos', agentsReady: 'agentes prontos', reportDone: 'Relatório pronto!',
+      },
+    };
+
+    // Detect language: localStorage > navigator > 'es'
+    function detectLang() {
+      var stored = localStorage.getItem('pancrocio_lang');
+      if (stored && LANG_STRINGS[stored]) return stored;
+      var nav = (navigator.language || 'es').split('-')[0].toLowerCase();
+      return LANG_STRINGS[nav] ? nav : 'es';
+    }
+
+    var currentLang = detectLang();
+    function t(key) { return (LANG_STRINGS[currentLang] || LANG_STRINGS.es)[key] || LANG_STRINGS.es[key] || key; }
+
+    function applyTranslations() {
+      document.querySelectorAll('[data-i18n]').forEach(function(el) {
+        el.textContent = t(el.getAttribute('data-i18n'));
+      });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
+        el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+      });
+      document.documentElement.lang = currentLang;
+    }
+
+    // Init selector
+    var langSelect = document.getElementById('langSelect');
+    langSelect.value = currentLang;
+    applyTranslations();
+
+    langSelect.addEventListener('change', function() {
+      currentLang = this.value;
+      localStorage.setItem('pancrocio_lang', currentLang);
+      applyTranslations();
+    });
+
     const form = document.getElementById('auditForm');
     const errorEl = document.getElementById('error');
     const submitBtn = document.getElementById('submitBtn');
@@ -439,16 +595,16 @@
       statAgents.style.display = 'inline-block';
       statChecks.style.display = 'inline-block';
       statTime.style.display = 'inline-block';
-      statAgents.innerHTML = '<strong>6</strong> agentes IA';
+      statAgents.innerHTML = '<strong>6</strong> ' + t('agentsLabel');
       statChecks.innerHTML = '<strong>50+</strong> checks';
-      statTime.innerHTML = '<strong>~2 min</strong> aprox.';
+      statTime.innerHTML = '<strong>~2 min</strong> ' + t('approx');
 
       elapsedTimer.style.display = 'block';
       timerInterval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
         const min = Math.floor(elapsed / 60);
         const sec = elapsed % 60;
-        elapsedTimer.textContent = `Tiempo: ${min}:${sec.toString().padStart(2, '0')}`;
+        elapsedTimer.textContent = `${t('timeLabel')}: ${min}:${sec.toString().padStart(2, '0')}`;
       }, 1000);
     }
 
@@ -472,10 +628,10 @@
       const email = document.getElementById('email').value.trim();
       const url = document.getElementById('url').value.trim();
 
-      if (!email || !url) return showError('Rellena ambos campos.');
+      if (!email || !url) return showError(t('errorBoth'));
 
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Iniciando auditoría...';
+      submitBtn.textContent = t('starting');
 
       try {
         const res = await fetch('/api/v1/audit', {
@@ -487,14 +643,14 @@
         const data = await res.json();
 
         if (!res.ok) {
-          showError(data.error || 'Something went wrong');
+          showError(data.error || t('errorFailed'));
           submitBtn.disabled = false;
-          submitBtn.textContent = 'Analizar mi web';
+          submitBtn.textContent = t('submitBtn');
           return;
         }
 
         progressSection.style.display = 'block';
-        submitBtn.textContent = 'Analizando...';
+        submitBtn.textContent = t('analyzing');
         document.querySelector('.hero').classList.add('compact');
         document.querySelector('.features-left').style.display = 'none';
         document.querySelector('.features-right').style.display = 'none';
@@ -504,9 +660,9 @@
         pollAudit(data.auditId);
 
       } catch (err) {
-        showError('Error de conexión. El servidor no responde.');
+        showError(t('errorConn'));
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Analizar mi web';
+        submitBtn.textContent = t('submitBtn');
       }
     });
 
@@ -528,9 +684,9 @@
           else if (data.status === 'failed') {
             clearInterval(interval);
             stopMotivationalLoop();
-            showError('La auditoría ha fallado. Inténtalo de nuevo.');
+            showError(t('errorFailed'));
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Analizar mi web';
+            submitBtn.textContent = t('submitBtn');
             return;
           }
           progressFill.style.width = progress + '%';
@@ -538,7 +694,7 @@
           const msgs = data.messages || [];
           const doneAgents = msgs.filter(m => m.includes('\u2713')).length;
           if (doneAgents > 0) {
-            statAgents.innerHTML = `<strong>${doneAgents}/6</strong> agentes listos`;
+            statAgents.innerHTML = `<strong>${doneAgents}/6</strong> ${t('agentsReady')}`;
           }
 
           if (data.status === 'completed') {
@@ -551,18 +707,18 @@
             motivationalCard.style.background = 'linear-gradient(135deg, #f0fdf4, #ecfdf5)';
             motivationalCard.style.borderColor = '#86efac';
             motivationalIcon.innerHTML = '&#x1F389;';
-            motivationalTitle.textContent = '¡Tu informe CRO está listo!';
-            motivationalText.textContent = 'Baja para ver tu informe personalizado de optimización de conversión con quick wins accionables.';
+            motivationalTitle.textContent = t('reportReady');
+            motivationalText.textContent = t('reportReadyDesc');
 
             const elapsed = Math.floor((Date.now() - startTime) / 1000);
             statTime.innerHTML = `<strong>${Math.floor(elapsed / 60)}m ${elapsed % 60}s</strong> total`;
 
-            submitBtn.textContent = 'Informe listo!';
+            submitBtn.textContent = t('reportDone');
             submitBtn.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
 
-            // Redirect to the full report page (works perfectly on mobile)
+            // Redirect to the full report page with selected language
             setTimeout(() => {
-              window.location.href = `/api/v1/audit/${auditId}/report`;
+              window.location.href = `/api/v1/audit/${auditId}/report?lang=${currentLang}`;
             }, 1500);
           }
         } catch (err) {}

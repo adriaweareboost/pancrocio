@@ -413,7 +413,7 @@ async function main() {
     } else {
       // Serve a clean verification page instead of blurred overlay
       const auditId = req.params.id;
-      const verifyPageHtml = buildVerifyPage(auditId, audit.url as string, audit.global_score as number);
+      const verifyPageHtml = buildVerifyPage(auditId, audit.url as string, audit.global_score as number, lang);
       res.setHeader('Content-Type', 'text/html');
       res.send(verifyPageHtml);
     }
@@ -665,7 +665,7 @@ function buildMockReportInput() {
 }
 
 // ─── Verify page (standalone, replaces blur-gate) ───
-function buildVerifyPage(auditId: string, url: string, score: number | null): string {
+function buildVerifyPage(auditId: string, url: string, score: number | null, lang = 'es'): string {
   const scoreDisplay = score !== null ? `<div style="margin-top:16px"><span style="font-size:48px;font-weight:800;color:#EC5F29">${score}</span><span style="font-size:18px;color:#9ca3af">/100</span></div>` : '';
   return `<!DOCTYPE html>
 <html lang="es">
@@ -722,7 +722,7 @@ function buildVerifyPage(auditId: string, url: string, score: number | null): st
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({code: code})
       }).then(function(r) { return r.json(); }).then(function(d) {
-        if (d.verified) { location.reload(); }
+        if (d.verified) { window.location.href = window.location.pathname + '?lang=' + '${lang}'; }
         else {
           document.getElementById('errorMsg').style.display = 'block';
           btn.disabled = false; btn.textContent = 'Desbloquear informe';
