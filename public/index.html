@@ -704,7 +704,7 @@
         const sec = elapsed % 60;
         elapsedTimer.textContent = `${t('timeLabel')}: ${min}:${sec.toString().padStart(2, '0')}`;
         // Show reset button after 2.5 minutes
-        if (elapsed >= 150 && !document.getElementById('resetBtn')) {
+        if (elapsed >= 165 && !document.getElementById('resetBtn')) {
           const btn = document.createElement('button');
           btn.id = 'resetBtn';
           btn.textContent = currentLang === 'es' ? 'Reintentar' : 'Try again';
