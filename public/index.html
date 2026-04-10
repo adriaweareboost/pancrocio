@@ -691,6 +691,16 @@
         const min = Math.floor(elapsed / 60);
         const sec = elapsed % 60;
         elapsedTimer.textContent = `${t('timeLabel')}: ${min}:${sec.toString().padStart(2, '0')}`;
+        // Show reset button after 3 minutes
+        if (elapsed >= 180 && !document.getElementById('resetBtn')) {
+          const btn = document.createElement('button');
+          btn.id = 'resetBtn';
+          btn.textContent = currentLang === 'es' ? 'Reintentar' : 'Try again';
+          btn.style.cssText = 'display:block;margin:16px auto 0;padding:12px 28px;background:#dc2626;color:white;border:none;border-radius:100px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit';
+          btn.onclick = function() { location.reload(); };
+          elapsedTimer.parentNode.insertBefore(btn, elapsedTimer.nextSibling);
+          elapsedTimer.textContent += ' — ' + (currentLang === 'es' ? 'El análisis está tardando más de lo esperado' : 'Analysis is taking longer than expected');
+        }
       }, 1000);
     }
 
