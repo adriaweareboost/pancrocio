@@ -765,6 +765,12 @@ function buildVerifyPage(auditId: string, url: string, score: number | null, lan
     <input type="text" id="codeInput" class="code-input" maxlength="6" placeholder="------" autocomplete="off" inputmode="numeric" autofocus>
     <button id="verifyBtn" class="submit-btn" onclick="verify()">Desbloquear informe</button>
     <div class="error" id="errorMsg">Código incorrecto. Inténtalo de nuevo.</div>
+    <div style="margin-top:16px;text-align:center">
+      <a href="https://mail.google.com" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#f3f4f6;border-radius:8px;color:#46495C;text-decoration:none;font-size:13px;font-weight:600;transition:background 0.2s" onmouseover="this.style.background='#e2e4ea'" onmouseout="this.style.background='#f3f4f6'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+        Open email
+      </a>
+    </div>
     <div class="resend">¿No lo recibes? <a onclick="resend()">Reenviar código</a></div>
     <div class="resend" id="resentMsg" style="display:none;color:#22c55e">¡Código reenviado!</div>
   </div>
