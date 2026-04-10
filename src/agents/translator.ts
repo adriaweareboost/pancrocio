@@ -69,19 +69,24 @@ interface BatchResponse {
  * Translates an array of strings into the target language via Groq JSON mode.
  * Returns the original array if the LLM response is malformed.
  */
-async function translateStrings(
+const CHUNK_SIZE = 15; // max strings per LLM call to avoid truncation
+
+/**
+ * Translates a single chunk of strings. The source language is auto-detected
+ * by the LLM (handles English findings being translated to Spanish, etc.).
+ */
+async function translateChunk(
   strings: string[],
   targetLang: string,
   llm: LLMProvider,
 ): Promise<string[]> {
-  if (strings.length === 0) return strings;
-
   const targetName = languageName(targetLang);
-  const prompt = `You are a professional translator. Translate the following Spanish strings to ${targetName}.
+  const prompt = `You are a professional translator. Translate ALL of the following strings to ${targetName}. The source language may vary (English, Spanish, or other) — auto-detect it.
 
 CRITICAL RULES:
 - Return a JSON object with key "translations" containing an array of strings.
 - The output array MUST have EXACTLY ${strings.length} items, in the SAME ORDER as the input.
+- If a string is ALREADY in ${targetName}, return it unchanged.
 - Some strings may contain HTML markup. Translate ONLY the visible text content; preserve ALL HTML tags, attributes, inline styles, class names, IDs, and the exact tag structure unchanged.
 - Preserve numbers, emojis, URLs, currency symbols, and these brand names as-is: PanCROcio, Boost, CRO, CTA, LCP, WebP.
 - Keep the tone professional but friendly, suitable for a marketing audit report.
@@ -104,6 +109,28 @@ ${JSON.stringify(strings)}`;
     console.warn(`[Translator] Failed for lang=${targetLang}:`, (err as Error).message);
     return strings;
   }
+}
+
+/**
+ * Translates an array of strings, splitting into chunks to avoid
+ * LLM truncation on large batches.
+ */
+async function translateStrings(
+  strings: string[],
+  targetLang: string,
+  llm: LLMProvider,
+): Promise<string[]> {
+  if (strings.length === 0) return strings;
+  if (strings.length <= CHUNK_SIZE) return translateChunk(strings, targetLang, llm);
+
+  // Split into chunks and translate sequentially (to respect rate limits)
+  const result: string[] = [];
+  for (let i = 0; i < strings.length; i += CHUNK_SIZE) {
+    const chunk = strings.slice(i, i + CHUNK_SIZE);
+    const translated = await translateChunk(chunk, targetLang, llm);
+    result.push(...translated);
+  }
+  return result;
 }
 
 /**
