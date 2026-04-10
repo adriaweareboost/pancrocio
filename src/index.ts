@@ -235,8 +235,9 @@ async function main() {
       });
     }
 
-    // Cache: reuse audit if this URL was analyzed in the last 7 days
-    const cachedAudit = getRecentAuditByUrl(normalized);
+    // Cache: reuse audit if this URL was analyzed in the last 7 days (skip with force=true)
+    const forceNew = req.body.force === true;
+    const cachedAudit = forceNew ? null : getRecentAuditByUrl(normalized);
     if (cachedAudit) {
       const cachedLeadId = uuid();
       const cachedCode = String(crypto.randomInt(100000, 999999));

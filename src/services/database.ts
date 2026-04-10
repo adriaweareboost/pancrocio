@@ -104,7 +104,7 @@ export async function saveDatabase(dbPath: string): Promise<void> {
 export function countRecentAuditsByEmail(email: string, days = 7): number {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const result = db.exec(
-    `SELECT COUNT(*) FROM leads l JOIN audits a ON l.audit_id = a.id WHERE l.email = ? AND a.created_at > ?`,
+    `SELECT COUNT(*) FROM leads l JOIN audits a ON l.audit_id = a.id WHERE l.email = ? AND a.created_at > ? AND a.status = 'completed'`,
     [email, since],
   );
   if (result.length === 0 || result[0].values.length === 0) return 0;
@@ -116,7 +116,7 @@ export function countRecentAuditsByEmail(email: string, days = 7): number {
 export function getRecentAuditByUrl(normalizedUrl: string, days = 7): Record<string, unknown> | null {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const result = db.exec(
-    `SELECT * FROM audits WHERE normalized_url = ? AND status = 'completed' AND completed_at > ? ORDER BY completed_at DESC LIMIT 1`,
+    `SELECT * FROM audits WHERE normalized_url = ? AND status = 'completed' AND completed_at > ? AND report_html IS NOT NULL AND LENGTH(report_html) > 10000 ORDER BY completed_at DESC LIMIT 1`,
     [normalizedUrl, since],
   );
   if (result.length === 0 || result[0].values.length === 0) return null;
