@@ -14,7 +14,7 @@ interface RateBucket {
 const rateBuckets = new Map<string, RateBucket>();
 const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const MAX_AUDITS_PER_IP = 20;          // 20 audits per hour per IP
-const MAX_REQUESTS_PER_IP = 60;        // 60 requests per hour per IP (general)
+const MAX_REQUESTS_PER_IP = 300;       // 300 requests per hour per IP (general — includes polling during analysis)
 
 function getClientIp(req: Request): string {
   return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
