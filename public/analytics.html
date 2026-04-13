@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>PanCROcio — Analytics</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Open Sans', -apple-system, sans-serif; background: #f8f9fb; color: #46495C; }
+    h1, h2, h3 { font-family: 'Plus Jakarta Sans', sans-serif; }
+
+    .header { background: #070F2D; color: white; padding: 20px 24px; display: flex; align-items: center; gap: 16px; }
+    .header img { width: 40px; height: 48px; }
+    .header h1 { font-size: 20px; font-weight: 800; }
+    .header h1 span { color: #EC5F29; }
+    .header .nav { margin-left: auto; display: flex; gap: 12px; }
+    .header .nav a { color: rgba(255,255,255,0.7); text-decoration: none; font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 8px; transition: all 0.2s; }
+    .header .nav a:hover, .header .nav a.active { color: white; background: rgba(255,255,255,0.1); }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .stat-card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(7,15,45,0.06); text-align: center; }
+    .stat-card .number { font-size: 36px; font-weight: 800; color: #070F2D; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .stat-card .label { font-size: 13px; color: #9ca3af; margin-top: 4px; }
+    .stat-card.highlight .number { color: #EC5F29; }
+
+    .section { margin-bottom: 32px; }
+    .section h2 { font-size: 18px; margin-bottom: 16px; color: #070F2D; }
+
+    .card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(7,15,45,0.06); }
+
+    /* Top findings */
+    .finding-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f3f4f6; }
+    .finding-row:last-child { border-bottom: none; }
+    .finding-rank { width: 32px; height: 32px; border-radius: 50%; background: #070F2D; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; font-family: 'Plus Jakarta Sans', sans-serif; flex-shrink: 0; }
+    .finding-rank.top3 { background: linear-gradient(135deg, #dd974b, #db501a); }
+    .finding-info { flex: 1; min-width: 0; }
+    .finding-title { font-weight: 600; font-size: 14px; color: #070F2D; }
+    .finding-meta { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+    .finding-count { font-weight: 800; font-size: 20px; color: #070F2D; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .finding-count small { font-size: 11px; font-weight: 400; color: #9ca3af; }
+
+    .badge-critical { background: #fef2f2; color: #dc2626; padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; }
+    .badge-warning { background: #fff7ed; color: #ea580c; padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; }
+    .badge-info { background: #eff6ff; color: #2563eb; padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; }
+
+    /* Category bars */
+    .cat-row { display: flex; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid #f3f4f6; }
+    .cat-row:last-child { border-bottom: none; }
+    .cat-name { width: 160px; font-weight: 600; font-size: 13px; flex-shrink: 0; }
+    .cat-bar-wrap { flex: 1; background: #f3f4f6; border-radius: 8px; height: 28px; position: relative; overflow: hidden; }
+    .cat-bar { height: 100%; border-radius: 8px; transition: width 0.6s ease; display: flex; align-items: center; padding-left: 10px; font-size: 12px; font-weight: 700; color: white; }
+    .cat-stats { width: 140px; text-align: right; font-size: 12px; color: #9ca3af; flex-shrink: 0; }
+    .cat-stats strong { color: #070F2D; font-weight: 700; }
+
+    /* Score distribution */
+    .dist-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .dist-item { text-align: center; padding: 16px; border-radius: 12px; background: #f8f9fb; }
+    .dist-item .count { font-size: 28px; font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .dist-item .range { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+
+    /* Severity distribution */
+    .sev-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .sev-card { text-align: center; padding: 20px; border-radius: 12px; }
+    .sev-card .count { font-size: 32px; font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .sev-card .label { font-size: 13px; margin-top: 4px; font-weight: 600; }
+    .sev-critical { background: #fef2f2; }
+    .sev-critical .count { color: #dc2626; }
+    .sev-critical .label { color: #dc2626; }
+    .sev-warning { background: #fff7ed; }
+    .sev-warning .count { color: #ea580c; }
+    .sev-warning .label { color: #ea580c; }
+    .sev-info { background: #eff6ff; }
+    .sev-info .count { color: #2563eb; }
+    .sev-info .label { color: #2563eb; }
+
+    /* Timeline */
+    .timeline { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding-top: 10px; }
+    .timeline-bar { flex: 1; background: linear-gradient(180deg, #dd974b, #db501a); border-radius: 4px 4px 0 0; min-height: 4px; position: relative; cursor: pointer; transition: opacity 0.2s; }
+    .timeline-bar:hover { opacity: 0.8; }
+    .timeline-bar .tooltip { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #070F2D; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; white-space: nowrap; margin-bottom: 4px; }
+    .timeline-bar:hover .tooltip { display: block; }
+    .timeline-labels { display: flex; gap: 4px; margin-top: 8px; }
+    .timeline-labels span { flex: 1; text-align: center; font-size: 10px; color: #9ca3af; }
+
+    .empty { text-align: center; padding: 48px; color: #9ca3af; font-size: 15px; }
+
+    .auth-form { max-width: 400px; margin: 100px auto; text-align: center; }
+    .auth-form input { width: 100%; padding: 12px 16px; border: 2px solid #e2e4ea; border-radius: 12px; font-size: 15px; outline: none; margin-bottom: 12px; }
+    .auth-form input:focus { border-color: #EC5F29; }
+    .auth-form button { width: 100%; padding: 12px; border: none; border-radius: 12px; background: linear-gradient(90deg, #dd974b, #db501a); color: white; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; }
+
+    @media (max-width: 768px) {
+      .cat-name { width: 100px; font-size: 11px; }
+      .cat-stats { width: 80px; font-size: 10px; }
+      .sev-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="/pancrocio.svg" alt="Logo" onerror="this.style.display='none'">
+    <h1>Pan<span>CRO</span>cio</h1>
+    <nav class="nav">
+      <a href="/admin">Leads</a>
+      <a href="/analytics" class="active">Analytics</a>
+    </nav>
+  </div>
+
+  <div id="auth" class="auth-form" style="display: none;">
+    <h2 style="margin-bottom: 16px;">Admin Analytics</h2>
+    <input type="password" id="keyInput" placeholder="Admin Key" autofocus>
+    <button onclick="authenticate()">Entrar</button>
+  </div>
+
+  <div id="dashboard" class="container" style="display: none;">
+    <!-- KPIs -->
+    <div class="stats" id="kpis"></div>
+
+    <!-- Severity distribution -->
+    <div class="section">
+      <h2>Distribucion por severidad</h2>
+      <div class="sev-grid" id="severityGrid"></div>
+    </div>
+
+    <!-- Top findings -->
+    <div class="section">
+      <h2>Errores mas comunes</h2>
+      <div class="card" id="topFindings"></div>
+    </div>
+
+    <!-- Category stats -->
+    <div class="section">
+      <h2>Rendimiento por categoria</h2>
+      <div class="card" id="categoryStats"></div>
+    </div>
+
+    <!-- Score distribution -->
+    <div class="section">
+      <h2>Distribucion de scores</h2>
+      <div class="dist-grid" id="scoreDistribution"></div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="section">
+      <h2>Auditorias en el tiempo</h2>
+      <div class="card">
+        <div class="timeline" id="timeline"></div>
+        <div class="timeline-labels" id="timelineLabels"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let adminKey = localStorage.getItem('pancrocio_admin_key') || '';
+
+    const CATEGORY_LABELS = {
+      visualHierarchy: 'Visual Hierarchy',
+      uxHeuristics: 'UX Heuristics',
+      copyMessaging: 'Copy & Messaging',
+      trustSignals: 'Trust Signals',
+      mobileExperience: 'Mobile Experience',
+      performance: 'Performance',
+    };
+
+    function barColor(score) {
+      if (score >= 80) return '#22c55e';
+      if (score >= 60) return '#84cc16';
+      if (score >= 40) return '#EC5F29';
+      return '#dc2626';
+    }
+
+    function authenticate() {
+      adminKey = document.getElementById('keyInput').value.trim();
+      if (!adminKey) return;
+      localStorage.setItem('pancrocio_admin_key', adminKey);
+      loadAnalytics();
+    }
+
+    document.getElementById('keyInput')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') authenticate();
+    });
+
+    async function loadAnalytics() {
+      try {
+        const res = await fetch(`/api/v1/admin/analytics?key=${encodeURIComponent(adminKey)}`);
+        if (res.status === 401) {
+          document.getElementById('auth').style.display = 'block';
+          document.getElementById('dashboard').style.display = 'none';
+          localStorage.removeItem('pancrocio_admin_key');
+          return;
+        }
+        const data = await res.json();
+        document.getElementById('auth').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        render(data);
+      } catch {
+        document.getElementById('auth').style.display = 'block';
+      }
+    }
+
+    function render(data) {
+      // KPIs
+      const totalFindings = data.severityDistribution.reduce((s, d) => s + d.count, 0);
+      document.getElementById('kpis').innerHTML = `
+        <div class="stat-card"><div class="number">${data.totalAudits}</div><div class="label">Auditorias completadas</div></div>
+        <div class="stat-card highlight"><div class="number">${data.avgGlobalScore}</div><div class="label">Score medio</div></div>
+        <div class="stat-card"><div class="number">${totalFindings}</div><div class="label">Findings totales</div></div>
+        <div class="stat-card"><div class="number">${data.topFindings.length}</div><div class="label">Errores unicos</div></div>
+      `;
+
+      // Severity
+      const sevMap = {};
+      data.severityDistribution.forEach(s => { sevMap[s.severity] = s.count; });
+      document.getElementById('severityGrid').innerHTML = `
+        <div class="sev-card sev-critical"><div class="count">${sevMap.critical || 0}</div><div class="label">Critical</div></div>
+        <div class="sev-card sev-warning"><div class="count">${sevMap.warning || 0}</div><div class="label">Warning</div></div>
+        <div class="sev-card sev-info"><div class="count">${sevMap.info || 0}</div><div class="label">Info</div></div>
+      `;
+
+      // Top findings
+      const topEl = document.getElementById('topFindings');
+      if (data.topFindings.length === 0) {
+        topEl.innerHTML = '<div class="empty">No hay datos de findings todavia. Ejecuta algunas auditorias.</div>';
+      } else {
+        topEl.innerHTML = data.topFindings.map((f, i) => `
+          <div class="finding-row">
+            <div class="finding-rank ${i < 3 ? 'top3' : ''}">${i + 1}</div>
+            <div class="finding-info">
+              <div class="finding-title">${escHtml(f.title)}</div>
+              <div class="finding-meta">
+                <span class="badge-${f.severity}">${f.severity}</span>
+                ${CATEGORY_LABELS[f.category] || f.category}
+              </div>
+            </div>
+            <div class="finding-count">${f.count}<small>x</small></div>
+          </div>
+        `).join('');
+      }
+
+      // Category stats
+      const catEl = document.getElementById('categoryStats');
+      if (data.categoryStats.length === 0) {
+        catEl.innerHTML = '<div class="empty">Sin datos de categorias.</div>';
+      } else {
+        catEl.innerHTML = data.categoryStats.map(c => `
+          <div class="cat-row">
+            <div class="cat-name">${CATEGORY_LABELS[c.category] || c.category}</div>
+            <div class="cat-bar-wrap">
+              <div class="cat-bar" style="width: ${Math.max(c.avgScore, 5)}%; background: ${barColor(c.avgScore)};">${c.avgScore}</div>
+            </div>
+            <div class="cat-stats">
+              <strong>${c.criticalCount}</strong> critical, <strong>${c.warningCount}</strong> warn
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Score distribution
+      const distEl = document.getElementById('scoreDistribution');
+      const distColors = { 'Excellent': '#22c55e', 'Good': '#84cc16', 'Fair': '#EC5F29', 'Poor': '#ea580c', 'Critical': '#dc2626' };
+      distEl.innerHTML = data.scoreDistribution.map(d => {
+        const keyword = d.range.match(/\((\w+)\)/)?.[1] || '';
+        const color = distColors[keyword] || '#070F2D';
+        return `
+          <div class="dist-item">
+            <div class="count" style="color: ${color};">${d.count}</div>
+            <div class="range">${d.range}</div>
+          </div>
+        `;
+      }).join('');
+
+      // Timeline
+      const timeEl = document.getElementById('timeline');
+      const labelsEl = document.getElementById('timelineLabels');
+      if (data.auditsOverTime.length === 0) {
+        timeEl.innerHTML = '<div class="empty" style="width:100%">Sin datos temporales.</div>';
+        labelsEl.innerHTML = '';
+      } else {
+        const maxCount = Math.max(...data.auditsOverTime.map(d => d.count), 1);
+        timeEl.innerHTML = data.auditsOverTime.map(d => {
+          const h = Math.max((d.count / maxCount) * 100, 4);
+          return `<div class="timeline-bar" style="height: ${h}%;"><div class="tooltip">${d.date}: ${d.count}</div></div>`;
+        }).join('');
+        labelsEl.innerHTML = data.auditsOverTime.map((d, i) => {
+          // Show label every ~5 bars
+          const show = i === 0 || i === data.auditsOverTime.length - 1 || i % 5 === 0;
+          return `<span>${show ? d.date.slice(5) : ''}</span>`;
+        }).join('');
+      }
+    }
+
+    function escHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // Auto-load if key is stored
+    if (adminKey) loadAnalytics();
+    else document.getElementById('auth').style.display = 'block';
+  </script>
+</body>
+</html>

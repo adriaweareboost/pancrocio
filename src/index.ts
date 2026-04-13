@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits } from './services/database.js';
+import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
 import { runPipeline } from './services/pipeline.js';
@@ -488,6 +488,10 @@ async function main() {
     res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
   });
 
+  app.get('/analytics', (_req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'analytics.html'));
+  });
+
   // Health check
   app.get('/api/v1/health', (_req, res) => {
     res.json({ status: 'ok', version: '0.1.0' });
@@ -513,6 +517,15 @@ async function main() {
     purgeAllAudits();
     saveDatabase(DB_PATH);
     res.json({ ok: true, message: 'All audits, leads, and cache purged.' });
+  });
+
+  app.get('/api/v1/admin/analytics', (req, res) => {
+    const adminKey = process.env.ADMIN_KEY;
+    if (!adminKey || req.query.key !== adminKey) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const analytics = getAnalytics();
+    res.json(analytics);
   });
 
   app.post('/api/v1/admin/reset-rate-limits', (req, res) => {
@@ -683,6 +696,7 @@ async function runAudit(
     JSON.stringify(analyses),
     reportHtml,
   );
+  saveFindings(auditId, url, JSON.stringify(analyses));
   saveDatabase(DB_PATH);
 
   addMessage('Audit complete!');
