@@ -620,18 +620,22 @@ async function runAudit(
     return;
   }
 
-  // Step 3: Translate LLM results if target lang is not English
+  // Step 3: Translate LLM results if target lang is not English (with 30s timeout)
   let { quickWins, mockups, analyses } = pipelineResult;
   if (lang !== 'en') {
     addMessage('Translating results...');
     try {
       const translateLlm = providers?.mockups || gemini;
-      const translated = await translateReportData(
+      const translatePromise = translateReportData(
         { quickWins, mockups, analyses },
         lang,
         translateLlm,
         true, // force: LLM responds in English, translate to target lang
       );
+      const translated = await Promise.race([
+        translatePromise,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Translation timed out after 30s')), 30000)),
+      ]);
       quickWins = translated.quickWins;
       mockups = translated.mockups;
       analyses = translated.analyses;
@@ -648,7 +652,11 @@ async function runAudit(
   let uiStrings = undefined;
   if (lang !== 'es') {
     try {
-      uiStrings = await getCachedUiStrings(lang, providers?.mockups || gemini);
+      const uiPromise = getCachedUiStrings(lang, providers?.mockups || gemini);
+      uiStrings = await Promise.race([
+        uiPromise,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('UI translation timed out')), 15000)),
+      ]);
     } catch { /* fallback to Spanish defaults */ }
   }
 
