@@ -14,7 +14,7 @@ import { initEmail, sendVerifyCodeEmail, sendReportEmail, sendLeadNotification }
 import { shouldTranslate, normalizeLangCode, translateReportData, translateUiStrings } from './agents/translator.js';
 import type { LLMProvider, AgentAnalysis, QuickWin, Mockup, CategoryScores } from './models/interfaces.js';
 import { normalizeUrl, isValidUrl, isValidEmail } from './utils/normalize-url.js';
-import { auditRateLimit, generalRateLimit, honeypotCheck, securityHeaders, corsProtection, hashEmail } from './services/security.js';
+import { auditRateLimit, generalRateLimit, honeypotCheck, securityHeaders, corsProtection, hashEmail, resetRateLimits } from './services/security.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,9 +24,10 @@ app.use(securityHeaders);
 app.use(corsProtection);
 app.use(express.json({ limit: '1mb' })); // limit body size
 app.use(express.static(path.join(__dirname, '..', 'public')));
-// Rate limit all API routes except admin
+// Rate limit all API routes except admin and progress polling (GET /api/v1/audit/:id)
 app.use('/api/', (req, res, next) => {
   if (req.path.startsWith('/v1/admin/')) return next();
+  if (req.method === 'GET' && /^\/v1\/audit\/[a-f0-9-]+$/.test(req.path)) return next();
   return generalRateLimit(req, res, next);
 });
 
@@ -512,6 +513,15 @@ async function main() {
     purgeAllAudits();
     saveDatabase(DB_PATH);
     res.json({ ok: true, message: 'All audits, leads, and cache purged.' });
+  });
+
+  app.post('/api/v1/admin/reset-rate-limits', (req, res) => {
+    const adminKey = process.env.ADMIN_KEY;
+    if (!adminKey || req.query.key !== adminKey) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const cleared = resetRateLimits();
+    res.json({ ok: true, message: `Cleared ${cleared} rate limit buckets.` });
   });
 
   // Preview report with mock data (for UI/CSS testing — no DB, no verify gate).

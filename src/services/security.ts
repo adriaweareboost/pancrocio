@@ -36,6 +36,13 @@ function checkRate(key: string, max: number): { allowed: boolean; remaining: num
   return { allowed: true, remaining: max - bucket.count, retryAfter: 0 };
 }
 
+/** Clear all rate limit buckets (used by admin reset endpoint). */
+export function resetRateLimits(): number {
+  const count = rateBuckets.size;
+  rateBuckets.clear();
+  return count;
+}
+
 // Cleanup stale buckets periodically
 setInterval(() => {
   const now = Date.now();
