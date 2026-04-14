@@ -894,15 +894,25 @@ function buildMockReportInput() {
   };
 }
 
-// ─── Verify page (standalone, replaces blur-gate) ───
+// ─── Verify page i18n ───
+const VERIFY_STRINGS: Record<string, { title: string; ready: string; subtitle: string; unlock: string; error: string; openEmail: string; noCode: string; resend: string; resent: string }> = {
+  es: { title: 'Verificar Email', ready: '¡Tu informe esta listo!', subtitle: 'Introduce el codigo de 6 digitos que te hemos enviado por email para desbloquear tu informe.', unlock: 'Desbloquear informe', error: 'Codigo incorrecto. Intentalo de nuevo.', openEmail: 'Abrir email', noCode: '¿No lo recibes?', resend: 'Reenviar codigo', resent: '¡Codigo reenviado!' },
+  en: { title: 'Verify Email', ready: 'Your report is ready!', subtitle: 'Enter the 6-digit code we sent to your email to unlock your report.', unlock: 'Unlock report', error: 'Incorrect code. Try again.', openEmail: 'Open email', noCode: "Didn't receive it?", resend: 'Resend code', resent: 'Code resent!' },
+  fr: { title: 'Verifier Email', ready: 'Votre rapport est pret !', subtitle: 'Entrez le code a 6 chiffres que nous avons envoye a votre email pour debloquer votre rapport.', unlock: 'Debloquer le rapport', error: 'Code incorrect. Reessayez.', openEmail: 'Ouvrir email', noCode: 'Pas recu ?', resend: 'Renvoyer le code', resent: 'Code renvoye !' },
+  de: { title: 'E-Mail bestatigen', ready: 'Ihr Bericht ist fertig!', subtitle: 'Geben Sie den 6-stelligen Code ein, den wir an Ihre E-Mail gesendet haben, um Ihren Bericht freizuschalten.', unlock: 'Bericht freischalten', error: 'Falscher Code. Versuchen Sie es erneut.', openEmail: 'E-Mail offnen', noCode: 'Nicht erhalten?', resend: 'Code erneut senden', resent: 'Code gesendet!' },
+  it: { title: 'Verifica Email', ready: 'Il tuo report e pronto!', subtitle: 'Inserisci il codice a 6 cifre che ti abbiamo inviato per email per sbloccare il tuo report.', unlock: 'Sblocca report', error: 'Codice errato. Riprova.', openEmail: 'Apri email', noCode: 'Non lo ricevi?', resend: 'Reinvia codice', resent: 'Codice reinviato!' },
+  pt: { title: 'Verificar Email', ready: 'Seu relatorio esta pronto!', subtitle: 'Insira o codigo de 6 digitos que enviamos para seu email para desbloquear seu relatorio.', unlock: 'Desbloquear relatorio', error: 'Codigo incorreto. Tente novamente.', openEmail: 'Abrir email', noCode: 'Nao recebeu?', resend: 'Reenviar codigo', resent: 'Codigo reenviado!' },
+};
+
 function buildVerifyPage(auditId: string, url: string, score: number | null, lang = 'es'): string {
+  const s = VERIFY_STRINGS[normalizeLangCode(lang)] || VERIFY_STRINGS.en;
   const scoreDisplay = score !== null ? `<div style="margin-top:16px"><span style="font-size:48px;font-weight:800;color:#EC5F29">${score}</span><span style="font-size:18px;color:#9ca3af">/100</span></div>` : '';
   return `<!DOCTYPE html>
 <html lang="${lang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Verificar Email — Scan&amp;Boost</title>
+  <title>${escapeHtml(s.title)} — Scan&amp;Boost</title>
   <link rel="icon" type="image/png" href="/favicon-boost.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
@@ -929,21 +939,21 @@ function buildVerifyPage(auditId: string, url: string, score: number | null, lan
 <body>
   <div class="verify-card">
     <h1 style="font-size:28px;color:#070F2D;margin-bottom:4px">Scan&amp;<span style="color:#EC5F29">Boost</span></h1>
-    <p style="font-size:16px;color:#070F2D;font-weight:600;margin-top:12px">¡Tu informe está listo!</p>
+    <p style="font-size:16px;color:#070F2D;font-weight:600;margin-top:12px">${escapeHtml(s.ready)}</p>
     <p class="url">${escapeHtml(url)}</p>
     ${scoreDisplay}
-    <p class="subtitle">Introduce el código de 6 dígitos que te hemos enviado por email para desbloquear tu informe.</p>
+    <p class="subtitle">${escapeHtml(s.subtitle)}</p>
     <input type="text" id="codeInput" class="code-input" maxlength="6" placeholder="------" autocomplete="off" inputmode="numeric" autofocus>
-    <button id="verifyBtn" class="submit-btn" onclick="verify()">Desbloquear informe</button>
-    <div class="error" id="errorMsg">Código incorrecto. Inténtalo de nuevo.</div>
+    <button id="verifyBtn" class="submit-btn" onclick="verify()" data-label="${escapeHtml(s.unlock)}">${escapeHtml(s.unlock)}</button>
+    <div class="error" id="errorMsg">${escapeHtml(s.error)}</div>
     <div style="margin-top:16px;text-align:center">
       <a href="https://mail.google.com" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#f3f4f6;border-radius:8px;color:#46495C;text-decoration:none;font-size:13px;font-weight:600;transition:background 0.2s" onmouseover="this.style.background='#e2e4ea'" onmouseout="this.style.background='#f3f4f6'">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-        Open email
+        ${escapeHtml(s.openEmail)}
       </a>
     </div>
-    <div class="resend">¿No lo recibes? <a onclick="resend()">Reenviar código</a></div>
-    <div class="resend" id="resentMsg" style="display:none;color:#22c55e">¡Código reenviado!</div>
+    <div class="resend">${escapeHtml(s.noCode)} <a onclick="resend()">${escapeHtml(s.resend)}</a></div>
+    <div class="resend" id="resentMsg" style="display:none;color:#22c55e">${escapeHtml(s.resent)}</div>
   </div>
   <div class="footer">Scan&amp;Boost &middot; Powered by <strong style="color:#070F2D">Boost</strong></div>
   <script>
@@ -952,7 +962,7 @@ function buildVerifyPage(auditId: string, url: string, score: number | null, lan
       var code = document.getElementById('codeInput').value.trim();
       if (code.length !== 6) return;
       var btn = document.getElementById('verifyBtn');
-      btn.disabled = true; btn.textContent = 'Verificando...';
+      btn.disabled = true; btn.textContent = '...';
       document.getElementById('errorMsg').style.display = 'none';
       fetch('/api/v1/audit/' + auditId + '/verify', {
         method: 'POST', headers: {'Content-Type':'application/json'},
@@ -961,10 +971,10 @@ function buildVerifyPage(auditId: string, url: string, score: number | null, lan
         if (d.verified) { window.location.href = window.location.pathname + '?lang=' + '${lang}'; }
         else {
           document.getElementById('errorMsg').style.display = 'block';
-          btn.disabled = false; btn.textContent = 'Desbloquear informe';
+          btn.disabled = false; btn.textContent = document.getElementById('verifyBtn').dataset.label;
         }
       }).catch(function() {
-        btn.disabled = false; btn.textContent = 'Desbloquear informe';
+        btn.disabled = false; btn.textContent = document.getElementById('verifyBtn').dataset.label;
       });
     }
     function resend() {
