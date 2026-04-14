@@ -132,6 +132,7 @@
       <div class="tab" onclick="switchTab('analytics')">Analytics</div>
       <div class="tab" onclick="switchTab('performance')">Performance</div>
       <div class="tab" onclick="switchTab('errors')">Errors</div>
+      <div class="tab" onclick="switchTab('backups')">Backups</div>
     </div>
 
     <div class="container">
@@ -176,6 +177,26 @@
         </div>
       </div>
 
+      <!-- BACKUPS TAB -->
+      <div id="tab-backups" class="tab-content">
+        <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;">
+          <button class="btn-primary" onclick="createBackupNow()">Crear backup ahora</button>
+          <button class="btn-secondary" onclick="downloadLiveDb()">Descargar BD actual</button>
+          <button class="btn-secondary" onclick="loadBackups()">Actualizar</button>
+        </div>
+        <div id="backupStatus" style="display:none;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:13px;font-weight:600;"></div>
+        <div class="card">
+          <h2>Backups disponibles (ultimos 7 dias)</h2>
+          <div class="table-wrap" style="box-shadow:none;">
+            <table>
+              <thead><tr><th>Archivo</th><th>Peso</th><th>Fecha</th><th>Acciones</th></tr></thead>
+              <tbody id="backupBody"></tbody>
+            </table>
+            <div class="empty" id="emptyBackups" style="display:none">No hay backups todavia. Se creara uno automaticamente en los proximos minutos.</div>
+          </div>
+        </div>
+      </div>
+
       <!-- ERRORS TAB -->
       <div id="tab-errors" class="tab-content">
         <div class="stats" id="errorStats"></div>
@@ -207,6 +228,7 @@
       if (name === 'analytics' && !window._analyticsLoaded) loadAnalytics();
       if (name === 'performance' && !window._perfLoaded) loadTimings();
       if (name === 'errors' && !window._errorsLoaded) loadErrors();
+      if (name === 'backups' && !window._backupsLoaded) loadBackups();
     }
 
     function login() {
@@ -350,6 +372,48 @@
           return `<tr><td><span class="badge-no">${esc(e.phase)}</span></td><td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.error_message)}</td><td class="url-cell">${esc(u)}</td><td class="date-cell">${d}</td></tr>`;
         }).join('');
       });
+    }
+
+    // ── BACKUPS ──
+    function loadBackups() {
+      fetchApi('backups').then(data => {
+        window._backupsLoaded = true;
+        const backups = data.backups || [];
+        document.getElementById('emptyBackups').style.display = backups.length ? 'none' : 'block';
+        document.getElementById('backupBody').innerHTML = backups.map(b => {
+          const sizeKb = (b.size / 1024).toFixed(0);
+          return `<tr>
+            <td style="font-family:monospace;font-size:12px">${esc(b.filename)}</td>
+            <td>${sizeKb} KB</td>
+            <td class="date-cell">${esc(b.date)}</td>
+            <td><a href="/api/v1/admin/backups/download?key=${encodeURIComponent(adminKey)}&file=${encodeURIComponent(b.filename)}" class="btn-secondary" style="display:inline-block;padding:4px 12px;border-radius:8px;text-decoration:none;font-size:11px">Descargar</a></td>
+          </tr>`;
+        }).join('') || '';
+      });
+    }
+    function createBackupNow() {
+      const status = document.getElementById('backupStatus');
+      status.style.display = 'block';
+      status.style.background = '#eff6ff';
+      status.style.color = '#2563eb';
+      status.textContent = 'Creando backup...';
+      fetch('/api/v1/admin/backups/create?key=' + encodeURIComponent(adminKey), { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          status.style.background = '#dcfce7';
+          status.style.color = '#16a34a';
+          status.textContent = 'Backup creado: ' + data.filename;
+          loadBackups();
+          setTimeout(() => { status.style.display = 'none'; }, 5000);
+        })
+        .catch(() => {
+          status.style.background = '#fef2f2';
+          status.style.color = '#dc2626';
+          status.textContent = 'Error al crear backup';
+        });
+    }
+    function downloadLiveDb() {
+      window.location.href = '/api/v1/admin/backups/download?key=' + encodeURIComponent(adminKey);
     }
 
     // Auto-login if key stored

@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats, saveAuditTiming, getTimingStats } from './services/database.js';
+import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats, saveAuditTiming, getTimingStats, startBackupScheduler, setBackupDbPath, createBackup, listBackups, getBackupFile, exportDatabase } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
 import { runPipeline } from './services/pipeline.js';
@@ -190,8 +190,10 @@ function cleanupProgress(): void {
 }
 
 async function main() {
-  // Init database
+  // Init database + backup system
   await initDatabase(DB_PATH);
+  setBackupDbPath(DB_PATH);
+  startBackupScheduler();
 
   // Recover orphaned audits from previous crashes
   const recovered = recoverOrphanedAudits();
@@ -516,6 +518,51 @@ async function main() {
     purgeAllAudits();
     saveDatabase(DB_PATH);
     res.json({ ok: true, message: 'All audits, leads, and cache purged.' });
+  });
+
+  // ─── Backup endpoints ───
+
+  app.get('/api/v1/admin/backups', (req, res) => {
+    const adminKey = process.env.ADMIN_KEY;
+    if (!adminKey || req.query.key !== adminKey) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    res.json({ backups: listBackups() });
+  });
+
+  app.post('/api/v1/admin/backups/create', async (req, res) => {
+    const adminKey = process.env.ADMIN_KEY;
+    if (!adminKey || req.query.key !== adminKey) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const filename = await createBackup();
+      res.json({ ok: true, filename });
+    } catch (err) {
+      res.status(500).json({ error: 'Backup failed', details: (err as Error).message });
+    }
+  });
+
+  app.get('/api/v1/admin/backups/download', (req, res) => {
+    const adminKey = process.env.ADMIN_KEY;
+    if (!adminKey || req.query.key !== adminKey) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const filename = req.query.file as string;
+    if (filename) {
+      // Download specific backup
+      const data = getBackupFile(filename);
+      if (!data) return res.status(404).json({ error: 'Backup not found' });
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.send(data);
+    }
+    // Download current live database
+    const data = exportDatabase();
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="croagent-live-${ts}.db"`);
+    res.send(data);
   });
 
   app.get('/api/v1/admin/timings', (req, res) => {
