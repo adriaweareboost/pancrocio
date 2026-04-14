@@ -133,5 +133,7 @@ export interface LLMProvider {
   generateText(prompt: string): Promise<string>;
   generateWithImage(prompt: string, image: Buffer): Promise<string>;
   generateJSON<T>(prompt: string): Promise<T>;
+  /** Direct call bypassing queue — for parallel batch operations. Falls back to generateJSON. */
+  generateJSONDirect?<T>(prompt: string): Promise<T>;
 }
 

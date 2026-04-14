@@ -83,6 +83,19 @@ export async function initDatabase(dbPath: string): Promise<Database> {
     db.run(`CREATE INDEX IF NOT EXISTS idx_findings_title ON findings(title)`);
   } catch { /* indices may already exist */ }
 
+  // Error log table for post-mortem analysis
+  db.run(`
+    CREATE TABLE IF NOT EXISTS error_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      audit_id TEXT,
+      phase TEXT NOT NULL,
+      error_message TEXT NOT NULL,
+      error_stack TEXT,
+      url TEXT,
+      created_at TEXT NOT NULL
+    )
+  `);
+
   // Auto-migrate existing audits into findings table
   migrateExistingFindings();
 
@@ -356,6 +369,46 @@ export function storePdf(auditId: string, lang: string, pdf: Buffer): void {
     `INSERT OR REPLACE INTO audit_pdfs (audit_id, lang, pdf, created_at) VALUES (?, ?, ?, ?)`,
     [auditId, lang, pdf, new Date().toISOString()],
   );
+}
+
+// ─── Error log ───
+
+export function logError(auditId: string | null, phase: string, error: Error | string, url?: string): void {
+  const msg = error instanceof Error ? error.message : error;
+  const stack = error instanceof Error ? error.stack?.slice(0, 500) : null;
+  db.run(
+    `INSERT INTO error_log (audit_id, phase, error_message, error_stack, url, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    [auditId, phase, msg, stack, url || null, new Date().toISOString()],
+  );
+}
+
+export function getErrorLog(limit = 50): Record<string, unknown>[] {
+  const result = db.exec(
+    `SELECT id, audit_id, phase, error_message, url, created_at FROM error_log ORDER BY created_at DESC LIMIT ?`,
+    [limit],
+  );
+  if (result.length === 0) return [];
+  const columns = result[0].columns;
+  return result[0].values.map((row) => {
+    const obj: Record<string, unknown> = {};
+    columns.forEach((col, i) => { obj[col] = row[i]; });
+    return obj;
+  });
+}
+
+export function getErrorStats(): { phase: string; count: number; lastSeen: string }[] {
+  const result = db.exec(`
+    SELECT phase, COUNT(*) as cnt, MAX(created_at) as last_seen
+    FROM error_log
+    GROUP BY phase
+    ORDER BY cnt DESC
+  `);
+  if (result.length === 0) return [];
+  return result[0].values.map((r) => ({
+    phase: r[0] as string,
+    count: r[1] as number,
+    lastSeen: r[2] as string,
+  }));
 }
 
 // ─── Findings: save normalized findings from audit ───

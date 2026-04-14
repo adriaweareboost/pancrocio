@@ -96,7 +96,9 @@ Input (JSON array of ${strings.length} strings):
 ${JSON.stringify(strings)}`;
 
   try {
-    const response = await llm.generateJSON<BatchResponse>(prompt);
+    // Use direct (queue-bypassing) call when available for true parallelism
+    const generate = llm.generateJSONDirect?.bind(llm) || llm.generateJSON.bind(llm);
+    const response = await generate<BatchResponse>(prompt);
     const translated = response?.translations;
     if (!Array.isArray(translated) || translated.length !== strings.length) {
       console.warn(

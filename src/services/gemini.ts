@@ -22,6 +22,11 @@ function createQueue() {
   };
 }
 
+/** Execute directly without queue — for parallel batch operations like translation. */
+function directCall<T>(fn: () => Promise<T>, label: string): Promise<T> {
+  return withRetry(fn, label);
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`[Gemini] ${label} timed out after ${ms / 1000}s`)), ms);
@@ -95,6 +100,17 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
           return JSON.parse(cleaned) as T;
         }, 'generateJSON')
       );
+    },
+
+    /** Direct call bypassing queue — use for parallel batch operations. */
+    async generateJSONDirect<T>(prompt: string): Promise<T> {
+      return directCall(async () => {
+        const jsonPrompt = `${prompt}\n\nIMPORTANT: Respond ONLY with valid JSON. No markdown, no code blocks, no explanation.`;
+        const result = await model.generateContent(jsonPrompt);
+        const text = result.response.text().trim();
+        const cleaned = text.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
+        return JSON.parse(cleaned) as T;
+      }, 'generateJSONDirect');
     },
   };
 }

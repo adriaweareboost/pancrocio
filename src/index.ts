@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics } from './services/database.js';
+import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
 import { runPipeline } from './services/pipeline.js';
@@ -291,14 +291,12 @@ async function main() {
     setVerifyCode(leadId, verifyCode);
     saveDatabase(DB_PATH);
 
-    // Send verification code via email (falls back to console.log in dev)
+    // Verification email will be sent AFTER audit completes (not before)
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`[Verify] Audit ${auditId} — email: ${email} — code: ${verifyCode}`);
+      console.log(`[Verify] Audit ${auditId} — email: ${email} — code: ${verifyCode} (will send after audit completes)`);
     } else {
-      console.log(`[Verify] Audit ${auditId} — email: ${hashEmail(email)} — code sent via email`);
+      console.log(`[Verify] Audit ${auditId} — email: ${hashEmail(email)} — code queued for post-audit`);
     }
-    sendVerifyCodeEmail(email, verifyCode, auditLang).catch(() => {});
-    sendLeadNotification(email, url, auditLang, undefined, auditId).catch(() => {});
 
     cleanupProgress();
     cleanupReportCache();
@@ -310,9 +308,10 @@ async function main() {
       message: 'Audit started. This may take 1-3 minutes.',
     });
 
-    // Run audit in background
-    runAudit(auditId, url, gemini, auditLang, { vision: geminiVision, text: geminiText, mockups: geminiTranslate }).catch((err) => {
+    // Run audit in background — verification email is sent AFTER audit completes
+    runAudit(auditId, url, email, verifyCode, gemini, auditLang, { vision: geminiVision, text: geminiText, mockups: geminiTranslate }).catch((err) => {
       console.error(`Audit ${auditId} failed:`, err);
+      logError(auditId, 'audit_global', err, url);
       updateAuditStatus(auditId, 'failed');
       saveDatabase(DB_PATH);
       auditProgress.set(auditId, {
@@ -519,6 +518,16 @@ async function main() {
     res.json({ ok: true, message: 'All audits, leads, and cache purged.' });
   });
 
+  app.get('/api/v1/admin/errors', (req, res) => {
+    const adminKey = process.env.ADMIN_KEY;
+    if (!adminKey || req.query.key !== adminKey) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const errors = getErrorLog(100);
+    const stats = getErrorStats();
+    res.json({ stats, errors });
+  });
+
   app.get('/api/v1/admin/analytics', (req, res) => {
     const adminKey = process.env.ADMIN_KEY;
     if (!adminKey || req.query.key !== adminKey) {
@@ -595,6 +604,8 @@ async function main() {
 async function runAudit(
   auditId: string,
   url: string,
+  email: string,
+  verifyCode: string,
   gemini: ReturnType<typeof createGeminiProvider>,
   lang = 'es',
   providers?: import('./services/pipeline.js').PipelineProviders,
@@ -613,7 +624,13 @@ async function runAudit(
   addMessage('Scraping website...');
   updateAuditStatus(auditId, 'scraping');
   saveDatabase(DB_PATH);
-  const scrapingResult = await scrapeUrl(url);
+  let scrapingResult;
+  try {
+    scrapingResult = await scrapeUrl(url);
+  } catch (err) {
+    logError(auditId, 'scraping', err as Error, url);
+    throw err;
+  }
   addMessage(`Scraped: ${(Buffer.byteLength(scrapingResult.html) / 1024).toFixed(0)}KB HTML, screenshots captured`);
 
   // Step 2: Analyze
@@ -621,7 +638,13 @@ async function runAudit(
   updateAuditStatus(auditId, 'analyzing');
   saveDatabase(DB_PATH);
 
-  const pipelineResult = await runPipeline(scrapingResult, url, gemini, addMessage, providers);
+  let pipelineResult;
+  try {
+    pipelineResult = await runPipeline(scrapingResult, url, gemini, addMessage, providers);
+  } catch (err) {
+    logError(auditId, 'pipeline', err as Error, url);
+    throw err;
+  }
 
   // Check if we got meaningful results (at least 2 categories beyond Performance)
   const realCategories = pipelineResult.analyses.filter(a => a.category !== 'performance').length;
@@ -653,7 +676,9 @@ async function runAudit(
       mockups = translated.mockups;
       analyses = translated.analyses;
     } catch (err) {
-      console.warn(`[Audit] Translation to ${lang} failed, using English results:`, (err as Error).message);
+      const msg = (err as Error).message;
+      console.warn(`[Audit] Translation to ${lang} failed, using English results:`, msg);
+      logError(auditId, 'translation', err as Error, url);
     }
   }
 
@@ -670,7 +695,9 @@ async function runAudit(
         uiPromise,
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('UI translation timed out')), 15000)),
       ]);
-    } catch { /* fallback to Spanish defaults */ }
+    } catch (err) {
+      logError(auditId, 'ui_translation', err as Error, url);
+    }
   }
 
   const reportHtml = generateReportHtml({
@@ -686,7 +713,7 @@ async function runAudit(
     pdfUrl: `/api/v1/audit/${auditId}/pdf?lang=${lang}`,
   });
 
-  // Step 4: Save
+  // Step 5: Save
   completeAudit(
     auditId,
     pipelineResult.globalScore,
@@ -702,24 +729,19 @@ async function runAudit(
   addMessage('Audit complete!');
   progress.status = 'completed';
 
-  // If user already verified email before audit finished, send report email now.
-  if (isEmailVerified(auditId)) {
-    const email = getLeadEmail(auditId);
-    if (email) {
-      const siteOrigin = SITE_ORIGIN;
-      const reportUrl = `${siteOrigin}/api/v1/audit/${auditId}/report`;
-      let pdfBuf: Buffer | undefined;
-      let pdfName: string | undefined;
-      try {
-        pdfBuf = await generateReportPdf(reportHtml);
-        storePdf(auditId, 'es', pdfBuf);
-        saveDatabase(DB_PATH);
-        pdfName = pdfFilename(url, lang);
-      } catch { /* PDF optional */ }
-      sendReportEmail(email, url, pipelineResult.globalScore, reportUrl, lang, pdfBuf, pdfName).catch(() => {});
-      sendLeadNotification(email, url, lang, pipelineResult.globalScore, auditId).catch(() => {});
-    }
-  }
+  // Step 6: NOW send verification email (only after report is ready)
+  sendVerifyCodeEmail(email, verifyCode, lang).catch((err) => {
+    logError(auditId, 'verify_email', err as Error, url);
+  });
+  sendLeadNotification(email, url, lang, pipelineResult.globalScore, auditId).catch(() => {});
+
+  // Generate PDF in background (non-blocking)
+  generateReportPdf(reportHtml).then((pdfBuf) => {
+    storePdf(auditId, lang, pdfBuf);
+    saveDatabase(DB_PATH);
+  }).catch((err) => {
+    logError(auditId, 'pdf_generation', err as Error, url);
+  });
 }
 
 // ─── Mock data for /preview endpoint ───
