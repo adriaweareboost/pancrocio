@@ -502,7 +502,7 @@ export function generateReportHtml(input: ReportInput): string {
   <meta name="generator" content="Scan&Boost">
   <meta name="theme-color" content="#070F2D">
   <link rel="canonical" href="${escapeHtml(canonicalUrl)}">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" href="/favicon-boost.png">
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Scan&Boost">
