@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats, deleteError, saveAuditTiming, getTimingStats, startBackupScheduler, setBackupDbPath, createBackup, listBackups, getBackupFile, exportDatabase, restoreFromBackup } from './services/database.js';
+import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats, deleteError, saveAuditTiming, getTimingStats, startBackupScheduler, setBackupDbPath, createBackup, listBackups, getBackupFile, exportDatabase, restoreFromBackup, findExistingLead } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
 import { runPipeline } from './services/pipeline.js';
@@ -269,19 +269,38 @@ async function main() {
     const cachedAudit = getRecentAuditByUrl(normalized);
     if (cachedAudit) {
       releaseAuditSlot(); // cached = no actual audit running
-      const cachedLeadId = uuid();
+
+      // Check if this email+domain combo already exists — skip creating duplicate lead
+      const existingLead = findExistingLead(email, normalized);
       const cachedCode = String(crypto.randomInt(100000, 999999));
-      createLead(cachedLeadId, email, url);
-      linkLeadToAudit(cachedLeadId, cachedAudit.id as string);
-      setVerifyCode(cachedLeadId, cachedCode);
-      saveDatabase(DB_PATH);
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`[Cache] Reusing audit ${cachedAudit.id} for ${url} — code: ${cachedCode}`);
+
+      if (existingLead) {
+        // Same email + same domain = reuse existing lead, just refresh verify code
+        setVerifyCode(existingLead.id, cachedCode);
+        saveDatabase(DB_PATH);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[Cache] Existing lead for ${email} + ${url} — code: ${cachedCode}`);
+        } else {
+          console.log(`[Cache] Existing lead for ${hashEmail(email)} + ${url}`);
+        }
       } else {
-        console.log(`[Cache] Reusing audit ${cachedAudit.id} for ${url} — ${hashEmail(email)}`);
+        // New email for this domain — create lead to capture it
+        const cachedLeadId = uuid();
+        createLead(cachedLeadId, email, url);
+        linkLeadToAudit(cachedLeadId, cachedAudit.id as string);
+        setVerifyCode(cachedLeadId, cachedCode);
+        saveDatabase(DB_PATH);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[Cache] New lead for ${email} + ${url} — code: ${cachedCode}`);
+        } else {
+          console.log(`[Cache] New lead for ${hashEmail(email)} + ${url}`);
+        }
+        sendLeadNotification(email, url, auditLang, cachedAudit.global_score as number, cachedAudit.id as string).catch(() => {});
       }
+
+      // Always require verification — send code
       sendVerifyCodeEmail(email, cachedCode, auditLang).catch(() => {});
-      sendLeadNotification(email, url, auditLang, cachedAudit.global_score as number, cachedAudit.id as string).catch(() => {});
+
       return res.status(201).json({
         auditId: cachedAudit.id,
         status: 'completed',
@@ -443,15 +462,20 @@ async function main() {
       return res.status(202).json({ error: 'Audit still in progress', code: 'AUDIT_IN_PROGRESS', status: audit.status });
     }
 
-    // Report is served in the language it was generated with (no on-the-fly translation)
-    const reportHtml = audit.report_html as string;
     const reportLang = (req.query.lang as string) || 'es';
-
     const verified = isEmailVerified(req.params.id);
 
     if (verified) {
-      res.setHeader('Content-Type', 'text/html');
-      res.send(reportHtml);
+      // Translate report on-demand if requested in a different language
+      try {
+        const html = await renderLocalizedReport(audit, reportLang, geminiTranslate);
+        res.setHeader('Content-Type', 'text/html');
+        res.send(html);
+      } catch {
+        // Fallback to original language
+        res.setHeader('Content-Type', 'text/html');
+        res.send(audit.report_html as string);
+      }
     } else {
       const auditId = req.params.id;
       const verifyPageHtml = buildVerifyPage(auditId, audit.url as string, audit.global_score as number, reportLang);

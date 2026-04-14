@@ -228,6 +228,27 @@ export function linkLeadToAudit(leadId: string, auditId: string): void {
   db.run(`UPDATE leads SET audit_id = ? WHERE id = ?`, [auditId, leadId]);
 }
 
+/** Check if a lead with this email already exists for this domain (normalized URL). */
+export function findExistingLead(email: string, normalizedUrl: string): { id: string; audit_id: string } | null {
+  // Extract domain from normalized URL for comparison
+  let domain = normalizedUrl;
+  try { domain = new URL(normalizedUrl).hostname; } catch { /* use as-is */ }
+
+  const result = db.exec(
+    `SELECT l.id, l.audit_id FROM leads l
+     WHERE LOWER(l.email) = LOWER(?)
+     AND l.audit_id IS NOT NULL
+     AND EXISTS (SELECT 1 FROM audits a WHERE a.id = l.audit_id AND a.normalized_url LIKE ?)
+     ORDER BY l.created_at DESC LIMIT 1`,
+    [email, `%${domain}%`],
+  );
+  if (result.length === 0 || result[0].values.length === 0) return null;
+  return {
+    id: result[0].values[0][0] as string,
+    audit_id: result[0].values[0][1] as string,
+  };
+}
+
 export function createLead(id: string, email: string, url: string): void {
   db.run(
     `INSERT INTO leads (id, email, url, created_at) VALUES (?, ?, ?, ?)`,
