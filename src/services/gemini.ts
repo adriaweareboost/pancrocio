@@ -22,9 +22,11 @@ function createQueue() {
   };
 }
 
-/** Execute directly without queue — for parallel batch operations like translation. */
+/** Execute directly without queue — for parallel batch operations like translation.
+ *  Uses fewer retries and shorter timeouts to avoid hanging. */
 function directCall<T>(fn: () => Promise<T>, label: string): Promise<T> {
-  return withRetry(fn, label);
+  // Single attempt with timeout — no retries for batch/translation calls
+  return withTimeout(fn(), 20000, label);
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {

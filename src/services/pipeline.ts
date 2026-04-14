@@ -65,12 +65,12 @@ export async function runPipeline(
     (async () => {
       onStatus?.('  → Gemini: analyzing visual hierarchy, trust signals, mobile...');
       try {
-        const r = await withPipelineTimeout(runGeminiConsolidated(input, visionLlm), 'Vision', 120000);
+        const r = await withPipelineTimeout(runGeminiConsolidated(input, visionLlm), 'Vision', 45000);
         onStatus?.('  ✓ Gemini analysis done');
         return r;
       } catch (err) {
-        console.error('Gemini consolidated failed:', err);
-        onStatus?.('  ✗ Gemini analysis failed, using fallback scores');
+        console.error('Gemini consolidated failed:', (err as Error).message);
+        onStatus?.(`  ✗ Gemini analysis failed: ${(err as Error).message?.slice(0, 80)}`);
         return null;
       }
     })(),
@@ -79,12 +79,12 @@ export async function runPipeline(
     (async () => {
       onStatus?.('  → Text analysis: analyzing copy, UX heuristics...');
       try {
-        const r = await withPipelineTimeout(runGroqConsolidated(scrapingResult.html, url, textLlm), 'Text analysis', 120000);
+        const r = await withPipelineTimeout(runGroqConsolidated(scrapingResult.html, url, textLlm), 'Text analysis', 45000);
         onStatus?.('  ✓ Text analysis done');
         return r;
       } catch (err) {
-        console.error('Text analysis consolidated failed:', err);
-        onStatus?.('  ✗ Text analysis failed, using fallback scores');
+        console.error('Text analysis consolidated failed:', (err as Error).message);
+        onStatus?.(`  ✗ Text analysis failed: ${(err as Error).message?.slice(0, 80)}`);
         return null;
       }
     })(),
