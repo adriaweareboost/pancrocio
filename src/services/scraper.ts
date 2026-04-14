@@ -28,11 +28,13 @@ export async function scrapeUrl(url: string): Promise<ScrapingResult> {
   try {
     const startTime = Date.now();
 
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    // Brief wait for above-the-fold rendering (images, fonts) without waiting for all network
+    await page.waitForTimeout(1500);
     const loadTimeMs = Date.now() - startTime;
 
     // Above-the-fold only (viewport screenshot, NOT full page) — much smaller image
-    const screenshotDesktop = await page.screenshot({ fullPage: false, type: 'jpeg', quality: 70 });
+    const screenshotDesktop = await page.screenshot({ fullPage: false, type: 'jpeg', quality: 60 });
     const pageTitle = await page.title();
 
     const html = await page.content();
@@ -47,8 +49,8 @@ export async function scrapeUrl(url: string): Promise<ScrapingResult> {
     });
 
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.waitForLoadState('networkidle').catch(() => {});
-    const screenshotMobile = await page.screenshot({ fullPage: false, type: 'jpeg', quality: 70 });
+    await page.waitForTimeout(500);
+    const screenshotMobile = await page.screenshot({ fullPage: false, type: 'jpeg', quality: 60 });
 
     return {
       html: truncatedHtml,

@@ -1,36 +1,25 @@
 import type { LLMProvider, QuickWin, Mockup } from '../models/interfaces.js';
 import { CATEGORY_LABELS } from '../utils/constants.js';
 
-function buildMockupPrompt(quickWin: QuickWin, url: string, pageDescription: string): string {
-  return `You are an expert UI/UX designer creating a wireframe mockup to illustrate a CRO improvement.
+function buildMockupPromptWithImage(quickWin: QuickWin, url: string): string {
+  return `You are an expert UI/UX designer. Look at this website screenshot and create a wireframe mockup showing an improved version.
 
-CONTEXT:
-- Website: ${url}
-- Current page description: ${pageDescription}
-- Category: ${CATEGORY_LABELS[quickWin.category] || quickWin.category}
+Website: ${url}
+Category: ${CATEGORY_LABELS[quickWin.category] || quickWin.category}
 
-PROBLEM FOUND:
-Title: ${quickWin.title}
-Problem: ${quickWin.problem}
-Recommendation: ${quickWin.recommendation}
+PROBLEM: ${quickWin.title}
+${quickWin.problem}
 
-TASK:
-Create a SELF-CONTAINED HTML wireframe that shows the IMPROVED version of this specific section.
-This is a BEFORE/AFTER wireframe - show what the improved section should look like.
+RECOMMENDATION: ${quickWin.recommendation}
 
-RULES:
-1. Use ONLY inline styles (no external CSS/fonts)
-2. Use a clean, modern design with good spacing
-3. Use a muted color palette: grays (#f8fafc, #e2e8f0, #64748b, #1e293b) with ONE accent color (#2563eb)
-4. Include realistic placeholder text (not lorem ipsum)
-5. The wireframe should be 600px wide max
-6. Add a small label at top: "PROPOSED IMPROVEMENT" in a colored badge
-7. Show clear visual hierarchy with the improvement highlighted
-8. Keep it simple but professional - this is a wireframe, not a full page redesign
-9. Use basic shapes, borders, and background colors to represent UI elements
-10. Include annotations as small gray italic text explaining the change
+Create a SELF-CONTAINED HTML wireframe of the IMPROVED section. Rules:
+1. ONLY inline styles, no external CSS/fonts
+2. Muted palette: grays (#f8fafc, #e2e8f0, #64748b, #1e293b) + accent #2563eb
+3. Realistic text, 600px max width
+4. Label "PROPOSED IMPROVEMENT" at top
+5. Annotations as small gray italic text
 
-Return ONLY the HTML code. No markdown, no code blocks, no explanation. Start with <div> and end with </div>.`;
+Return ONLY HTML. No markdown, no code blocks. Start with <div>.`;
 }
 
 function extractPageDescription(html: string, url: string): string {
@@ -69,20 +58,6 @@ export async function generateMockups(
   fallbackLlm?: LLMProvider,
   html?: string,
 ): Promise<Mockup[]> {
-  // Try to get page description from Gemini (vision), fallback to HTML parsing
-  let pageDescription: string;
-  try {
-    pageDescription = await gemini.generateWithImage(
-      'Describe this website screenshot briefly in 3 sentences. Focus on layout, main sections, colors, and CTAs. Be factual.',
-      screenshotDesktop,
-    );
-  } catch {
-    pageDescription = html
-      ? extractPageDescription(html, url)
-      : `Website at ${url}`;
-    console.log('[Mockup] Gemini vision failed, using HTML-based description');
-  }
-
   const topQuickWins = quickWins.slice(0, 1);
   const mockups: Mockup[] = [];
 
@@ -90,19 +65,21 @@ export async function generateMockups(
     try {
       onStatus?.(`  → Generating wireframe for: "${qw.title}"...`);
 
-      const prompt = buildMockupPrompt(qw, url, pageDescription);
+      // Single vision call: screenshot + mockup instructions (was 2 calls before)
+      const prompt = buildMockupPromptWithImage(qw, url);
 
-      // Try primary LLM first, fallback to secondary
       let htmlContent: string;
       try {
-        htmlContent = await gemini.generateText(prompt);
+        htmlContent = await gemini.generateWithImage(prompt, screenshotDesktop);
       } catch {
-        if (fallbackLlm) {
-          console.log('[Mockup] Primary LLM failed, using fallback');
-          onStatus?.('  → Switching to fallback LLM for wireframe...');
-          htmlContent = await fallbackLlm.generateText(prompt);
+        // Fallback: text-only with HTML description
+        if (fallbackLlm || gemini) {
+          const llm = fallbackLlm || gemini;
+          const pageDesc = html ? extractPageDescription(html, url) : `Website at ${url}`;
+          const textPrompt = prompt.replace('Look at this website screenshot and create', `Based on this page (${pageDesc}), create`);
+          htmlContent = await llm.generateText(textPrompt);
         } else {
-          throw new Error('Gemini failed and no fallback available');
+          throw new Error('Mockup generation failed');
         }
       }
 

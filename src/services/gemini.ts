@@ -1,10 +1,10 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { LLMProvider } from '../models/interfaces.js';
 
-const MAX_RETRIES = 4;
-const BASE_DELAY_MS = 5000;
-const DELAY_BETWEEN_CALLS_MS = 2000;
-const CALL_TIMEOUT_MS = 45000;
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 2000;
+const DELAY_BETWEEN_CALLS_MS = 200; // Minimal delay — each provider has its own key/queue
+const CALL_TIMEOUT_MS = 30000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));

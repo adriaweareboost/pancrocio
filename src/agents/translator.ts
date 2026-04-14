@@ -123,14 +123,15 @@ async function translateStrings(
   if (strings.length === 0) return strings;
   if (strings.length <= CHUNK_SIZE) return translateChunk(strings, targetLang, llm);
 
-  // Split into chunks and translate sequentially (to respect rate limits)
-  const result: string[] = [];
+  // Split into chunks and translate ALL in parallel (each provider has its own key)
+  const chunks: string[][] = [];
   for (let i = 0; i < strings.length; i += CHUNK_SIZE) {
-    const chunk = strings.slice(i, i + CHUNK_SIZE);
-    const translated = await translateChunk(chunk, targetLang, llm);
-    result.push(...translated);
+    chunks.push(strings.slice(i, i + CHUNK_SIZE));
   }
-  return result;
+  const translatedChunks = await Promise.all(
+    chunks.map(chunk => translateChunk(chunk, targetLang, llm)),
+  );
+  return translatedChunks.flat();
 }
 
 /**
