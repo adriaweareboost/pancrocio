@@ -1,8 +1,8 @@
-// PanCROcio Report — shared client-side JS extracted from report-generator.ts
-// Reads localised labels and audit URL from window.PANCROCIO_REPORT (set inline in the HTML).
+// Scan&Boost Report — shared client-side JS extracted from report-generator.ts
+// Reads localised labels and audit URL from window.SCANBOOST_REPORT (set inline in the HTML).
 
 (function () {
-  var cfg = window.PANCROCIO_REPORT || {};
+  var cfg = window.SCANBOOST_REPORT || {};
   var sendingLabel = cfg.sendingLabel || 'Sending...';
   var retryLabel = cfg.retryLabel || 'Retry';
   var errorAlert = cfg.errorAlert || 'Error sending. Please try again.';
@@ -34,7 +34,7 @@
     // Prepend the audited URL to the message so the sales team has context.
     // The /api/contact endpoint uses Zod strict and rejects unknown fields,
     // so we cannot add `auditUrl` or `source` as separate keys.
-    var contextLine = auditUrl ? '[PanCROcio Audit: ' + auditUrl + ']\n\n' : '';
+    var contextLine = auditUrl ? '[Scan&Boost Audit: ' + auditUrl + ']\n\n' : '';
     var payload = {
       name: data.get('name'),
       email: data.get('email'),
@@ -62,7 +62,7 @@
         if (window.dataLayer) {
           window.dataLayer.push({
             event: 'form_submit',
-            form_name: 'pancrocio-report',
+            form_name: 'scanboost-report',
             form_page: window.location.pathname,
             form_language: document.documentElement.lang || 'es',
           });

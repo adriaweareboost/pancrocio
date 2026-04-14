@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>PanCROcio — Admin</title>
+  <title>Scan&amp;Boost — Admin</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
@@ -114,7 +114,7 @@
 <body>
   <div id="loginScreen" class="login">
     <div class="login-card">
-      <img src="/pancrocio.svg" alt="PanCROcio">
+      <img src="/scanboost.svg" alt="Scan&amp;Boost">
       <h2>Admin Dashboard</h2>
       <input type="password" id="keyInput" placeholder="Admin Key" autofocus>
       <button onclick="login()">Acceder</button>
@@ -124,8 +124,8 @@
 
   <div id="dashboard" style="display:none">
     <div class="header">
-      <img src="/pancrocio.svg" alt="" onerror="this.style.display='none'">
-      <h1>Pan<span>CRO</span>cio</h1>
+      <img src="/scanboost.svg" alt="" onerror="this.style.display='none'">
+      <h1>Scan&amp;<span>Boost</span></h1>
     </div>
     <div class="tabs">
       <div class="tab active" onclick="switchTab('leads')">Leads</div>
@@ -214,7 +214,7 @@
   </div>
 
   <script>
-    let adminKey = localStorage.getItem('pancrocio_admin_key') || '';
+    let adminKey = localStorage.getItem('scanboost_admin_key') || '';
     const CAT_LABELS = { visualHierarchy:'Visual Hierarchy', uxHeuristics:'UX Heuristics', copyMessaging:'Copy & Messaging', trustSignals:'Trust Signals', mobileExperience:'Mobile Experience', performance:'Performance' };
 
     function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -234,14 +234,14 @@
     function login() {
       adminKey = document.getElementById('keyInput').value.trim();
       if (!adminKey) return;
-      localStorage.setItem('pancrocio_admin_key', adminKey);
+      localStorage.setItem('scanboost_admin_key', adminKey);
       fetchApi('leads').then(data => {
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('dashboard').style.display = 'block';
         renderLeads(data);
       }).catch(() => {
         document.getElementById('loginError').style.display = 'block';
-        localStorage.removeItem('pancrocio_admin_key');
+        localStorage.removeItem('scanboost_admin_key');
       });
     }
     document.getElementById('keyInput').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
@@ -423,7 +423,7 @@
         document.getElementById('dashboard').style.display = 'block';
         renderLeads(data);
       }).catch(() => {
-        localStorage.removeItem('pancrocio_admin_key');
+        localStorage.removeItem('scanboost_admin_key');
         document.getElementById('loginScreen').style.display = 'flex';
       });
     }

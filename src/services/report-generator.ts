@@ -4,7 +4,7 @@ import { escapeHtml, escapeJsString, sanitizeMockupHtml } from '../utils/html.js
 /** Translatable UI labels used in the report template. */
 export interface ReportUiStrings {
   reportSubtitle: string;
-  pancrocioSays: string;
+  brandSays: string;
   scoresByCategoryTitle: string;
   topQuickWinsTitle: string;
   topQuickWinsSubtitle: string;
@@ -44,10 +44,10 @@ export interface ReportUiStrings {
   mobileSuccessSubtitle: string;
   footerGeneratedBy: string;
   poweredBy: string;
-  pancrocioCommentExcellent: string;
-  pancrocioCommentGood: string;
-  pancrocioCommentFair: string;
-  pancrocioCommentPoor: string;
+  brandCommentExcellent: string;
+  brandCommentGood: string;
+  brandCommentFair: string;
+  brandCommentPoor: string;
   // Category labels (translatable)
   catVisualHierarchy: string;
   catUxHeuristics: string;
@@ -67,7 +67,7 @@ export interface ReportUiStrings {
 
 export const DEFAULT_UI_STRINGS: ReportUiStrings = {
   reportSubtitle: 'Informe de Auditoría CRO',
-  pancrocioSays: 'PanCROcio dice:',
+  brandSays: 'Resultado del análisis:',
   scoresByCategoryTitle: 'Puntuaciones por Categoría',
   topQuickWinsTitle: 'Quick Wins Principales',
   topQuickWinsSubtitle: 'Mejoras de alto impacto y bajo esfuerzo',
@@ -78,7 +78,7 @@ export const DEFAULT_UI_STRINGS: ReportUiStrings = {
   quickWinPrefix: 'QUICK WIN',
   detailedAnalysisTitle: 'Análisis Detallado',
   ctaTitle: '¿Quieres mejorar tu conversión?',
-  ctaSubtitle: 'PanCROcio ha encontrado oportunidades. Contáctanos y te ayudamos a implementar estas mejoras.',
+  ctaSubtitle: 'Hemos detectado oportunidades de mejora en tu web. Contáctanos y te ayudamos a implementarlas.',
   formNameLabel: 'Nombre / Empresa',
   formNamePlaceholder: 'Nombre / Empresa',
   formEmailLabel: 'Email',
@@ -102,15 +102,15 @@ export const DEFAULT_UI_STRINGS: ReportUiStrings = {
   sidebarSuccessTitle: 'Enviado!',
   sidebarSuccessSubtitle: 'Te escribimos pronto.',
   mobileTitle: 'Mejora tu web',
-  mobileSubtitle: 'PanCROcio te ayuda',
+  mobileSubtitle: 'Mejora tu conversión',
   mobileSuccessTitle: 'Gracias!',
   mobileSuccessSubtitle: 'Te contactaremos pronto.',
   footerGeneratedBy: 'Generado por',
   poweredBy: 'Powered by',
-  pancrocioCommentExcellent: '¡Tu sitio se ve genial! Solo unos retoques y estarás convirtiendo como un profesional.',
-  pancrocioCommentGood: '¡Base sólida! He encontrado áreas clave donde pequeños cambios pueden marcar la diferencia.',
-  pancrocioCommentFair: 'Hay potencial real aquí. Déjame mostrarte los quick wins que moverán la aguja.',
-  pancrocioCommentPoor: 'No te preocupes — todo gran sitio empezó en algún lugar. Estas son las mejoras de alto impacto a priorizar.',
+  brandCommentExcellent: '¡Tu sitio se ve genial! Solo unos retoques y estarás convirtiendo como un profesional.',
+  brandCommentGood: '¡Base sólida! He encontrado áreas clave donde pequeños cambios pueden marcar la diferencia.',
+  brandCommentFair: 'Hay potencial real aquí. Déjame mostrarte los quick wins que moverán la aguja.',
+  brandCommentPoor: 'No te preocupes — todo gran sitio empezó en algún lugar. Estas son las mejoras de alto impacto a priorizar.',
   catVisualHierarchy: 'Jerarquía Visual',
   catUxHeuristics: 'Heurísticas UX',
   catCopyMessaging: 'Copy y Mensajes',
@@ -149,7 +149,7 @@ interface ReportInput {
   uiStrings?: ReportUiStrings;
   /** ISO 639-1 short code (e.g. "es", "fr"). Drives <html lang> + og:locale. */
   lang?: string;
-  /** Public origin for canonical/OG URLs (e.g. "https://pancrocio.up.railway.app"). */
+  /** Public origin for canonical/OG URLs (e.g. "https://scanandboost.weareboost.online"). */
   siteOrigin?: string;
   /** If set, renders a "Download PDF" button in the header pointing to this URL. */
   pdfUrl?: string;
@@ -181,40 +181,16 @@ const CATEGORY_ICONS: Record<keyof CategoryScores, string> = {
 // browser always fetches the latest CSS/JS even if URL is the same.
 const ASSET_VERSION = String(Date.now());
 
-// PanCROcio inline SVG (simplified for report embedding)
-const PANCROCIO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" width="80" height="96" style="vertical-align:middle">
-  <rect x="60" y="120" width="80" height="80" rx="16" fill="#f0f4ff" stroke="#c7d2fe" stroke-width="2"/>
-  <path d="M80 120 L100 145 L120 120" fill="none" stroke="#818cf8" stroke-width="2"/>
-  <rect x="96" y="140" width="8" height="30" rx="3" fill="#EC5F29"/>
-  <polygon points="96,170 104,170 100,180" fill="#EC5F29"/>
-  <circle cx="100" cy="80" r="42" fill="#fbbf24" stroke="#f59e0b" stroke-width="2"/>
-  <path d="M62 68 Q70 30 100 38 Q130 30 138 68" fill="#92400e" stroke="#78350f" stroke-width="1.5"/>
-  <ellipse cx="84" cy="78" rx="10" ry="11" fill="white"/>
-  <circle cx="86" cy="79" r="5" fill="#1e293b"/>
-  <circle cx="87" cy="77" r="2" fill="white"/>
-  <ellipse cx="116" cy="78" rx="10" ry="11" fill="white"/>
-  <circle cx="118" cy="79" r="5" fill="#1e293b"/>
-  <circle cx="119" cy="77" r="2" fill="white"/>
-  <circle cx="84" cy="78" r="14" fill="none" stroke="#475569" stroke-width="2.5"/>
-  <circle cx="116" cy="78" r="14" fill="none" stroke="#475569" stroke-width="2.5"/>
-  <line x1="98" y1="78" x2="102" y2="78" stroke="#475569" stroke-width="2.5"/>
-  <path d="M85 95 Q100 108 115 95" fill="none" stroke="#92400e" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M74 64 Q84 58 94 64" fill="none" stroke="#78350f" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M106 64 Q116 58 126 64" fill="none" stroke="#78350f" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M60 140 Q30 150 28 170" fill="none" stroke="#fbbf24" stroke-width="10" stroke-linecap="round"/>
-  <circle cx="22" cy="185" r="14" fill="none" stroke="#475569" stroke-width="3"/>
-  <circle cx="22" cy="185" r="10" fill="#dbeafe" opacity="0.5"/>
-  <line x1="32" y1="195" x2="42" y2="208" stroke="#475569" stroke-width="3.5" stroke-linecap="round"/>
-  <path d="M140 140 Q165 148 168 168" fill="none" stroke="#fbbf24" stroke-width="10" stroke-linecap="round"/>
-  <rect x="155" y="165" width="30" height="38" rx="4" fill="white" stroke="#cbd5e1" stroke-width="1.5"/>
-  <rect x="155" y="165" width="30" height="8" rx="4" fill="#EC5F29"/>
-  <rect x="160" y="192" width="5" height="6" fill="#22c55e"/>
-  <rect x="167" y="188" width="5" height="10" fill="#f59e0b"/>
-  <rect x="174" y="183" width="5" height="15" fill="#EC5F29"/>
-  <rect x="75" y="158" width="20" height="15" rx="3" fill="#e0e7ff" stroke="#818cf8" stroke-width="1"/>
-  <text x="85" y="169" font-size="7" font-weight="bold" fill="#4338ca" text-anchor="middle" font-family="sans-serif">CRO</text>
-  <ellipse cx="82" cy="202" rx="14" ry="6" fill="#475569"/>
-  <ellipse cx="118" cy="202" rx="14" ry="6" fill="#475569"/>
+// Brand inline SVG — scan/boost icon (no character)
+const BRAND_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 96" width="80" height="96" style="vertical-align:middle">
+  <circle cx="32" cy="32" r="22" fill="none" stroke="#EC5F29" stroke-width="3"/>
+  <line x1="48" y1="48" x2="62" y2="62" stroke="#EC5F29" stroke-width="4" stroke-linecap="round"/>
+  <path d="M24 32 L30 38 L42 26" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="10" y="72" width="12" height="16" rx="2" fill="#e2e8f0"/>
+  <rect x="26" y="66" width="12" height="22" rx="2" fill="#EC5F29"/>
+  <rect x="42" y="60" width="12" height="28" rx="2" fill="#22c55e"/>
+  <rect x="58" y="54" width="12" height="34" rx="2" fill="#070F2D"/>
+  <path d="M56 70 L68 56" fill="none" stroke="#EC5F29" stroke-width="2" stroke-dasharray="3 2"/>
 </svg>`;
 
 function scoreColor(score: number): string {
@@ -290,11 +266,11 @@ function renderCategoryBar(label: string, key: keyof CategoryScores, score: Scor
     </a>`;
 }
 
-function pancrocioComment(score: number, ui: ReportUiStrings): string {
-  if (score >= 80) return ui.pancrocioCommentExcellent;
-  if (score >= 60) return ui.pancrocioCommentGood;
-  if (score >= 40) return ui.pancrocioCommentFair;
-  return ui.pancrocioCommentPoor;
+function brandComment(score: number, ui: ReportUiStrings): string {
+  if (score >= 80) return ui.brandCommentExcellent;
+  if (score >= 60) return ui.brandCommentGood;
+  if (score >= 40) return ui.brandCommentFair;
+  return ui.brandCommentPoor;
 }
 
 // ─── Template sections (extracted to keep generateReportHtml readable) ───
@@ -303,7 +279,7 @@ function renderSidebar(ui: ReportUiStrings): string {
   return `
     <aside class="sidebar-lead" role="complementary" aria-labelledby="sidebar-title">
       <header style="text-align:center;margin-bottom:16px">
-        <span aria-hidden="true">${PANCROCIO_SVG.replace('width="80" height="96"', 'width="56" height="67"')}</span>
+        <span aria-hidden="true">${BRAND_SVG.replace('width="80" height="96"', 'width="56" height="67"')}</span>
         <h2 id="sidebar-title" style="font-size:15px;color:#070F2D;font-weight:800;margin-top:8px">${escapeHtml(ui.sidebarTitle)}</h2>
         <p style="font-size:12px;color:#46495C;margin-top:4px;line-height:1.4">${escapeHtml(ui.sidebarSubtitle)}</p>
       </header>
@@ -332,7 +308,7 @@ function renderSidebar(ui: ReportUiStrings): string {
         <p style="font-size:12px;color:#46495C">${escapeHtml(ui.sidebarSuccessSubtitle)}</p>
       </div>
       <footer style="text-align:center;margin-top:14px;padding-top:14px;border-top:1px solid #e2e4ea">
-        <p style="font-size:10px;color:#9ca3af">${escapeHtml(ui.poweredBy)} <strong style="color:#070F2D">Boost</strong></p>
+        <p style="font-size:10px;color:#9ca3af">${escapeHtml(ui.poweredBy)} <a href="https://www.weareboost.online" target="_blank" rel="noopener" style="color:#070F2D;text-decoration:none;font-weight:700">Boost</a></p>
       </footer>
     </aside>`;
 }
@@ -348,7 +324,7 @@ function renderMobilePopup(ui: ReportUiStrings): string {
   <div class="mobile-lead-popup" id="mobilePopup" role="dialog" aria-modal="true" aria-labelledby="mobile-popup-title">
     <header style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div style="display:flex;align-items:center;gap:10px">
-        <span aria-hidden="true">${PANCROCIO_SVG.replace('width="80" height="96"', 'width="40" height="48"')}</span>
+        <span aria-hidden="true">${BRAND_SVG.replace('width="80" height="96"', 'width="40" height="48"')}</span>
         <div>
           <h2 id="mobile-popup-title" style="font-size:16px;color:#070F2D;font-weight:800;margin:0">${escapeHtml(ui.mobileTitle)}</h2>
           <p style="font-size:12px;color:#46495C;margin:0">${escapeHtml(ui.mobileSubtitle)}</p>
@@ -388,7 +364,7 @@ function renderContactCta(ui: ReportUiStrings): string {
       <div id="contactSection" class="contact-bottom" style="background:#070F2D;border-radius:20px;padding:40px 32px;margin-top:32px;box-shadow:0 4px 24px rgba(7,15,45,0.15)">
         <section aria-labelledby="cta-title">
           <header style="text-align:center;margin-bottom:24px">
-            <div aria-hidden="true" style="margin-bottom:8px">${PANCROCIO_SVG}</div>
+            <div aria-hidden="true" style="margin-bottom:8px">${BRAND_SVG}</div>
             <h2 id="cta-title" style="font-size:24px;color:white;font-weight:800;margin-bottom:6px">${escapeHtml(ui.ctaTitle)}</h2>
             <p style="color:rgba(255,255,255,0.65);font-size:14px;max-width:420px;margin:0 auto">${escapeHtml(ui.ctaSubtitle)}</p>
           </header>
@@ -431,7 +407,7 @@ export function generateReportHtml(input: ReportInput): string {
   const ogLocale = OG_LOCALES[lang] || 'es_ES';
   const safeDate = escapeHtml(date);
   // SEO meta strings — kept short to fit Google/OG limits.
-  const seoTitle = `PanCROcio \u2014 ${ui.reportSubtitle} \u2014 ${url} (${globalScore}/100)`;
+  const seoTitle = `Scan&Boost \u2014 ${ui.reportSubtitle} \u2014 ${url} (${globalScore}/100)`;
   const seoDescription = `${ui.reportSubtitle} \u2014 ${url}. ${globalScore}/100 puntos. ${quickWins.length} quick wins, ${mockups.length} mockups, ${analyses.length} categorías analizadas.`;
   // Site origin: prefer explicit input, fall back to SITE_ORIGIN env var, default to weareboost.
   // Defensive: strip trailing slash and prepend https:// if the user forgot the protocol.
@@ -444,14 +420,14 @@ export function generateReportHtml(input: ReportInput): string {
   const jsonLd = JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'Report',
-    name: `PanCROcio \u2014 ${ui.reportSubtitle} \u2014 ${input.url}`,
+    name: `Scan&Boost \u2014 ${ui.reportSubtitle} \u2014 ${input.url}`,
     headline: `${ui.reportSubtitle} \u2014 ${input.url}`,
     description: seoDescription,
     inLanguage: lang,
     datePublished: date,
     dateCreated: date,
     url: canonicalUrl,
-    author: { '@type': 'Organization', name: 'PanCROcio', url: siteOrigin },
+    author: { '@type': 'Organization', name: 'Scan&Boost', url: siteOrigin },
     publisher: { '@type': 'Organization', name: 'Boost', url: 'https://www.weareboost.online' },
     about: { '@type': 'WebSite', url: input.url },
     reviewRating: {
@@ -522,20 +498,20 @@ export function generateReportHtml(input: ReportInput): string {
   <title>${escapeHtml(seoTitle)}</title>
   <meta name="description" content="${escapeHtml(seoDescription)}">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="author" content="PanCROcio by Boost">
-  <meta name="generator" content="PanCROcio">
+  <meta name="author" content="Scan&Boost by Boost">
+  <meta name="generator" content="Scan&Boost">
   <meta name="theme-color" content="#070F2D">
   <link rel="canonical" href="${escapeHtml(canonicalUrl)}">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="article">
-  <meta property="og:site_name" content="PanCROcio">
+  <meta property="og:site_name" content="Scan&Boost">
   <meta property="og:locale" content="${escapeHtml(ogLocale)}">
   <meta property="og:title" content="${escapeHtml(seoTitle)}">
   <meta property="og:description" content="${escapeHtml(seoDescription)}">
   <meta property="og:url" content="${escapeHtml(canonicalUrl)}">
   <meta property="og:image" content="${escapeHtml(ogImage)}">
-  <meta property="og:image:alt" content="PanCROcio — ${escapeHtml(ui.reportSubtitle)}">
+  <meta property="og:image:alt" content="Scan&Boost — ${escapeHtml(ui.reportSubtitle)}">
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${escapeHtml(seoTitle)}">
@@ -557,8 +533,8 @@ export function generateReportHtml(input: ReportInput): string {
       ${escapeHtml(ui.downloadPdfButton)}
     </a>` : ''}
     <div style="max-width:800px;margin:0 auto">
-      <div aria-hidden="true" style="margin-bottom:12px">${PANCROCIO_SVG}</div>
-      <h1 style="font-size:32px;font-weight:800;margin-bottom:6px;letter-spacing:-0.5px">Pan<span style="color:#EC5F29">CRO</span>cio <span style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">${escapeHtml(ui.reportSubtitle)}</span></h1>
+      <div aria-hidden="true" style="margin-bottom:12px">${BRAND_SVG}</div>
+      <h1 style="font-size:32px;font-weight:800;margin-bottom:6px;letter-spacing:-0.5px">Scan&amp;<span style="color:#EC5F29">Boost</span> <span style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">${escapeHtml(ui.reportSubtitle)}</span></h1>
       <p style="font-size:14px;opacity:0.7;margin-bottom:4px">${escapeHtml(ui.reportSubtitle)}</p>
       <p style="font-size:13px;opacity:0.5;word-break:break-all">${url} &middot; <time datetime="${safeDate}">${safeDate}</time></p>
     </div>
@@ -567,12 +543,12 @@ export function generateReportHtml(input: ReportInput): string {
   <div class="page-wrapper">
     <!-- ═══ MAIN REPORT ═══ -->
     <main class="report-main" role="main">
-      <!-- PanCROcio comment + Score -->
+      <!-- Score + comment -->
       <div style="background:white;border-radius:0 0 20px 20px;padding:32px;margin-bottom:24px;text-align:center;box-shadow:0 4px 24px rgba(7,15,45,0.08)">
         ${renderScoreGauge(globalScore)}
         <blockquote style="margin-top:16px;background:linear-gradient(135deg,#fff7ed,#fef3e2);border-radius:12px;padding:16px 20px;border:1px solid #fed7aa;display:inline-block;max-width:500px">
           <p style="font-size:14px;color:#070F2D;line-height:1.6;margin:0">
-            <span aria-hidden="true">${scoreEmoji(globalScore)}</span> <strong>${escapeHtml(ui.pancrocioSays)}</strong> "${escapeHtml(pancrocioComment(globalScore, ui))}"
+            <span aria-hidden="true">${scoreEmoji(globalScore)}</span> <strong>${escapeHtml(ui.brandSays)}</strong> "${escapeHtml(brandComment(globalScore, ui))}"
           </p>
         </blockquote>
       </div>
@@ -647,7 +623,8 @@ export function generateReportHtml(input: ReportInput): string {
 
       <!-- Footer -->
       <footer role="contentinfo" style="text-align:center;margin-top:24px;padding:16px;color:#9ca3af;font-size:12px">
-        <p>${escapeHtml(ui.footerGeneratedBy)} <strong style="color:#EC5F29">PanCROcio</strong> &middot; ${escapeHtml(ui.poweredBy)} <strong style="color:#070F2D">Boost</strong></p>
+        <p>${escapeHtml(ui.footerGeneratedBy)} <a href="https://www.weareboost.online" target="_blank" rel="noopener" style="color:#EC5F29;text-decoration:none;font-weight:700">Scan&amp;Boost</a> &middot; ${escapeHtml(ui.poweredBy)} <a href="https://www.weareboost.online" target="_blank" rel="noopener" style="color:#070F2D;text-decoration:none;font-weight:700">Boost</a></p>
+        <p style="margin-top:4px"><a href="https://www.weareboost.online" target="_blank" rel="noopener" style="color:#EC5F29;text-decoration:none;font-size:11px">weareboost.online</a></p>
       </footer>
     </main>
 
@@ -657,7 +634,7 @@ export function generateReportHtml(input: ReportInput): string {
   ${renderMobilePopup(ui)}
 
   <script>
-    window.PANCROCIO_REPORT = {
+    window.SCANBOOST_REPORT = {
       auditUrl: '${urlJs}',
       sendingLabel: '${escapeJsString(ui.formSendingButton)}',
       retryLabel: '${escapeJsString(ui.formRetryButton)}',

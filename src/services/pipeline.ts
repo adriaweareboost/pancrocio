@@ -47,7 +47,7 @@ export async function runPipeline(
     loadTimeMs: scrapingResult.loadTimeMs,
   };
 
-  onStatus?.('Running AI analysis (parallel agents)...');
+  onStatus?.('Running AI analysis (parallel checks)...');
 
   // Timeout wrapper: fail gracefully after 60s per provider
   const withPipelineTimeout = <T>(promise: Promise<T>, label: string, ms = 60000): Promise<T> =>

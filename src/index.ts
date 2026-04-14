@@ -33,7 +33,7 @@ app.use('/api/', (req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const SITE_ORIGIN = (process.env.SITE_ORIGIN || 'https://pancrocio-production.up.railway.app').replace(/\/$/, '');
+const SITE_ORIGIN = (process.env.SITE_ORIGIN || 'https://pancrocio.weareboost.online').replace(/\/$/, '');
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'croagent.db');
 
 // In-memory audit status tracking (auto-cleanup after 30 min)
@@ -665,7 +665,7 @@ async function main() {
 
   // Start server
   app.listen(PORT, () => {
-    console.log(`\n🚀 PanCROcio running at http://localhost:${PORT}\n`);
+    console.log(`\n🚀 Scan&Boost running at http://localhost:${PORT}\n`);
   });
 
   // Graceful shutdown
@@ -713,7 +713,7 @@ async function runAudit(
   addMessage(`Scraped: ${(Buffer.byteLength(scrapingResult.html) / 1024).toFixed(0)}KB HTML, screenshots captured (${(scrapeMs / 1000).toFixed(1)}s)`);
 
   // Step 2: Analyze
-  addMessage('Running CRO analysis agents...');
+  addMessage('Running CRO analysis...');
   updateAuditStatus(auditId, 'analyzing');
   saveDatabase(DB_PATH);
 
@@ -883,7 +883,7 @@ function buildVerifyPage(auditId: string, url: string, score: number | null, lan
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Verificar Email — PanCROcio</title>
+  <title>Verificar Email — Scan&amp;Boost</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
@@ -909,7 +909,7 @@ function buildVerifyPage(auditId: string, url: string, score: number | null, lan
 </head>
 <body>
   <div class="verify-card">
-    <div class="logo"><img src="/pancrocio.svg" alt="PanCROcio" width="80" height="96"></div>
+    <div class="logo"><img src="/scanboost.svg" alt="Scan&amp;Boost" width="80" height="96"></div>
     <h1 style="font-size:24px;color:#070F2D">¡Tu informe está listo!</h1>
     <p class="url">${escapeHtml(url)}</p>
     ${scoreDisplay}
@@ -926,7 +926,7 @@ function buildVerifyPage(auditId: string, url: string, score: number | null, lan
     <div class="resend">¿No lo recibes? <a onclick="resend()">Reenviar código</a></div>
     <div class="resend" id="resentMsg" style="display:none;color:#22c55e">¡Código reenviado!</div>
   </div>
-  <div class="footer">PanCROcio &middot; Powered by <strong style="color:#070F2D">Boost</strong></div>
+  <div class="footer">Scan&amp;Boost &middot; Powered by <strong style="color:#070F2D">Boost</strong></div>
   <script>
     var auditId = '${auditId.replace(/[^a-f0-9-]/g, '')}';
     function verify() {

@@ -88,7 +88,7 @@ CRITICAL RULES:
 - The output array MUST have EXACTLY ${strings.length} items, in the SAME ORDER as the input.
 - If a string is ALREADY in ${targetName}, return it unchanged.
 - Some strings may contain HTML markup. Translate ONLY the visible text content; preserve ALL HTML tags, attributes, inline styles, class names, IDs, and the exact tag structure unchanged.
-- Preserve numbers, emojis, URLs, currency symbols, and these brand names as-is: PanCROcio, Boost, CRO, CTA, LCP, WebP.
+- Preserve numbers, emojis, URLs, currency symbols, and these brand names as-is: Scan&Boost, Boost, CRO, CTA, LCP, WebP.
 - Keep the tone professional but friendly, suitable for a marketing audit report.
 - Do not add explanations, do not wrap output in markdown code blocks.
 
