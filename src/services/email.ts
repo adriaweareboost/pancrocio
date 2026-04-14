@@ -169,7 +169,7 @@ export async function sendVerifyCodeEmail(to: string, code: string, lang = 'es')
     </div>
     <p style="text-align:center;font-size:12px;color:#9ca3af;margin-top:20px">${escapeHtml(s.verifyExpiry)}</p>
   `);
-  return send(to, `${s.verifySubject}: ${code}`, html);
+  return send(to, s.verifySubject, html);
 }
 
 /** Email 2: Report ready + PDF attachment (translated to user's lang). */

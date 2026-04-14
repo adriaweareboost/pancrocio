@@ -14,12 +14,13 @@ import { initEmail, sendVerifyCodeEmail, sendReportEmail, sendLeadNotification }
 import { shouldTranslate, normalizeLangCode, translateReportData, translateUiStrings } from './agents/translator.js';
 import type { LLMProvider, AgentAnalysis, QuickWin, Mockup, CategoryScores } from './models/interfaces.js';
 import { normalizeUrl, isValidUrl, isValidEmail } from './utils/normalize-url.js';
-import { auditRateLimit, generalRateLimit, honeypotCheck, securityHeaders, corsProtection, hashEmail, resetRateLimits } from './services/security.js';
+import { escapeHtml } from './utils/html.js';
+import { auditRateLimit, generalRateLimit, verifyRateLimit, sendCodeRateLimit, honeypotCheck, securityHeaders, corsProtection, hashEmail, resetRateLimits, acquireAuditSlot, releaseAuditSlot, isPrivateUrl } from './services/security.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
-app.set('trust proxy', true); // Railway runs behind a proxy — trust x-forwarded-for for correct IP detection
+app.set('trust proxy', 1); // Trust only Railway's proxy (1 hop), not user-supplied X-Forwarded-For
 app.use(securityHeaders);
 app.use(corsProtection);
 app.use(express.json({ limit: '1mb' })); // limit body size
@@ -240,6 +241,16 @@ async function main() {
       return res.status(400).json({ error: 'Valid URL (http/https) is required', code: 'INVALID_URL' });
     }
 
+    // SSRF protection — block private/internal URLs
+    if (await isPrivateUrl(url)) {
+      return res.status(400).json({ error: 'URL must be a public website', code: 'INVALID_URL' });
+    }
+
+    // Concurrency limit — prevent resource exhaustion
+    if (!acquireAuditSlot()) {
+      return res.status(503).json({ error: 'Server busy. Please try again in a minute.', code: 'SERVER_BUSY' });
+    }
+
     const normalized = normalizeUrl(url);
 
     // Rate limit: max 5 audits per email per week (whitelisted emails bypass)
@@ -254,10 +265,10 @@ async function main() {
       }
     }
 
-    // Cache: reuse audit if this URL was analyzed in the last 7 days (skip with force=true)
-    const forceNew = req.body.force === true;
-    const cachedAudit = forceNew ? null : getRecentAuditByUrl(normalized);
+    // Cache: reuse audit if this URL was analyzed in the last 7 days
+    const cachedAudit = getRecentAuditByUrl(normalized);
     if (cachedAudit) {
+      releaseAuditSlot(); // cached = no actual audit running
       const cachedLeadId = uuid();
       const cachedCode = String(crypto.randomInt(100000, 999999));
       createLead(cachedLeadId, email, url);
@@ -311,17 +322,19 @@ async function main() {
     });
 
     // Run audit in background — verification email is sent AFTER audit completes
-    runAudit(auditId, url, email, verifyCode, gemini, auditLang, { vision: geminiVision, text: geminiText, mockups: geminiTranslate }).catch((err) => {
-      console.error(`Audit ${auditId} failed:`, err);
-      logError(auditId, 'audit_global', err, url);
-      updateAuditStatus(auditId, 'failed');
-      saveDatabase(DB_PATH);
-      auditProgress.set(auditId, {
-        status: 'failed',
-        messages: [...(auditProgress.get(auditId)?.messages || []), `Error: ${err.message}`],
-        createdAt: auditProgress.get(auditId)?.createdAt || Date.now(),
-      });
-    });
+    runAudit(auditId, url, email, verifyCode, gemini, auditLang, { vision: geminiVision, text: geminiText, mockups: geminiTranslate })
+      .catch((err) => {
+        console.error(`Audit ${auditId} failed:`, err);
+        logError(auditId, 'audit_global', err, url);
+        updateAuditStatus(auditId, 'failed');
+        saveDatabase(DB_PATH);
+        auditProgress.set(auditId, {
+          status: 'failed',
+          messages: [...(auditProgress.get(auditId)?.messages || []), `Error: ${err.message}`],
+          createdAt: auditProgress.get(auditId)?.createdAt || Date.now(),
+        });
+      })
+      .finally(() => releaseAuditSlot());
   });
 
   // Check audit status
@@ -346,33 +359,39 @@ async function main() {
     });
   });
 
-  // Send verification code (re-send)
-  app.post('/api/v1/audit/:id/send-code', (req, res) => {
-    const audit = getAudit(req.params.id);
+  // Send verification code (re-send) — rate limited: 3/hour per audit
+  app.post('/api/v1/audit/:id/send-code', sendCodeRateLimit, (req, res) => {
+    const id = req.params.id as string;
+    const audit = getAudit(id);
     if (!audit) {
       return res.status(404).json({ error: 'Audit not found', code: 'NOT_FOUND' });
     }
-    const email = getLeadEmail(req.params.id);
+    const email = getLeadEmail(id);
     // Generate new code
     const newCode = String(crypto.randomInt(100000, 999999));
-    const leadResult = getAudit(req.params.id);
+    const leadResult = getAudit(id);
     if (leadResult) {
       const leadId = leadResult.lead_id as string;
       setVerifyCode(leadId, newCode);
       saveDatabase(DB_PATH);
-      console.log(`[Verify] Re-sent code for ${req.params.id} — email: ${email} — code: ${newCode}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[Verify] Re-sent code for ${id} — email: ${email} — code: ${newCode}`);
+      } else {
+        console.log(`[Verify] Re-sent code for ${id} — ${email ? hashEmail(email) : 'unknown'}`);
+      }
       if (email) sendVerifyCodeEmail(email, newCode, 'es').catch(() => {});
     }
     res.json({ ok: true, message: 'Verification code sent to your email' });
   });
 
-  // Verify email code — on success, send the report email if audit is completed.
-  app.post('/api/v1/audit/:id/verify', (req, res) => {
+  // Verify email code — rate limited: 5 attempts per 15 min per audit
+  app.post('/api/v1/audit/:id/verify', verifyRateLimit, (req, res) => {
+    const id = req.params.id as string;
     const { code } = req.body;
     if (!code) {
       return res.status(400).json({ error: 'Code is required', code: 'MISSING_CODE' });
     }
-    const success = verifyEmailCode(req.params.id, String(code));
+    const success = verifyEmailCode(id, String(code));
     if (!success) {
       return res.status(403).json({ error: 'Invalid verification code', code: 'INVALID_CODE' });
     }
@@ -381,7 +400,7 @@ async function main() {
 
     // Fire-and-forget: send the report email if audit is already completed.
     const siteOrigin = SITE_ORIGIN;
-    const auditId = req.params.id;
+    const auditId = id;
     (async () => {
       const audit = getAudit(auditId);
       if (!audit || audit.status !== 'completed') return; // audit still running, will send later
@@ -489,8 +508,9 @@ async function main() {
     res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
   });
 
+  // /analytics now integrated in /admin — redirect
   app.get('/analytics', (_req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'public', 'analytics.html'));
+    res.redirect('/admin');
   });
 
   // Health check
@@ -891,7 +911,7 @@ function buildVerifyPage(auditId: string, url: string, score: number | null, lan
   <div class="verify-card">
     <div class="logo"><img src="/pancrocio.svg" alt="PanCROcio" width="80" height="96"></div>
     <h1 style="font-size:24px;color:#070F2D">¡Tu informe está listo!</h1>
-    <p class="url">${url}</p>
+    <p class="url">${escapeHtml(url)}</p>
     ${scoreDisplay}
     <p class="subtitle">Introduce el código de 6 dígitos que te hemos enviado por email para desbloquear tu informe.</p>
     <input type="text" id="codeInput" class="code-input" maxlength="6" placeholder="------" autocomplete="off" inputmode="numeric" autofocus>
@@ -908,7 +928,7 @@ function buildVerifyPage(auditId: string, url: string, score: number | null, lan
   </div>
   <div class="footer">PanCROcio &middot; Powered by <strong style="color:#070F2D">Boost</strong></div>
   <script>
-    var auditId = '${auditId}';
+    var auditId = '${auditId.replace(/[^a-f0-9-]/g, '')}';
     function verify() {
       var code = document.getElementById('codeInput').value.trim();
       if (code.length !== 6) return;
