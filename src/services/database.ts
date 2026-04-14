@@ -766,6 +766,34 @@ export function exportDatabase(): Buffer {
   return Buffer.from(data);
 }
 
+/** Restore database from a backup file. Creates a safety backup of current DB first. */
+export async function restoreFromBackup(filename: string): Promise<{ ok: boolean; message: string }> {
+  const backupData = getBackupFile(filename);
+  if (!backupData) return { ok: false, message: 'Backup not found' };
+
+  // Safety backup of current state before overwriting
+  try {
+    await createBackup();
+  } catch { /* best effort */ }
+
+  try {
+    const SQL = await initSqlJs();
+    const newDb = new SQL.Database(backupData);
+    // Verify it's a valid database by running a simple query
+    newDb.exec('SELECT COUNT(*) FROM audits');
+    // Replace the live database
+    db.close();
+    db = newDb;
+    // Persist to disk
+    const dbPath = backupDbPath || '/app/data/croagent.db';
+    await writeFile(dbPath, Buffer.from(db.export()));
+    console.log(`[Backup] Restored from ${filename}`);
+    return { ok: true, message: `Restored from ${filename}` };
+  } catch (err) {
+    return { ok: false, message: `Restore failed: ${(err as Error).message}` };
+  }
+}
+
 /** Start daily backup scheduler. */
 export function startBackupScheduler(): void {
   // Initial backup on startup (after 30s to let migrations run)

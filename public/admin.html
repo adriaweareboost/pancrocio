@@ -140,7 +140,6 @@
         <div class="toolbar">
           <input type="text" id="searchInput" placeholder="Buscar por email o URL..." oninput="filterTable()">
           <button class="btn-secondary" onclick="loadLeads()">Actualizar</button>
-          <button class="btn-danger" onclick="purgeData()">Purgar todo</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -384,7 +383,10 @@
             <td style="font-family:monospace;font-size:12px">${esc(b.filename)}</td>
             <td>${sizeKb} KB</td>
             <td class="date-cell">${esc(b.date)}</td>
-            <td><a href="/api/v1/admin/backups/download?key=${encodeURIComponent(adminKey)}&file=${encodeURIComponent(b.filename)}" style="display:inline-block;padding:6px 16px;border-radius:10px;text-decoration:none;font-size:12px;font-weight:600;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;box-shadow:0 2px 6px rgba(59,130,246,0.25);transition:all 0.2s;">Descargar</a></td>
+            <td style="display:flex;gap:6px;">
+              <a href="/api/v1/admin/backups/download?key=${encodeURIComponent(adminKey)}&file=${encodeURIComponent(b.filename)}" style="display:inline-block;padding:6px 14px;border-radius:10px;text-decoration:none;font-size:11px;font-weight:600;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;box-shadow:0 2px 6px rgba(59,130,246,0.25);">Descargar</a>
+              <button onclick="restoreBackup('${b.filename}')" style="padding:6px 14px;border:none;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;box-shadow:0 2px 6px rgba(245,158,11,0.25);">Restaurar</button>
+            </td>
           </tr>`;
         }).join('') || '';
       });
@@ -408,6 +410,34 @@
           status.style.background = '#fef2f2';
           status.style.color = '#dc2626';
           status.textContent = 'Error al crear backup';
+        });
+    }
+    function restoreBackup(filename) {
+      if (!confirm('Restaurar este backup? Se creara una copia de seguridad del estado actual antes de restaurar.')) return;
+      const status = document.getElementById('backupStatus');
+      status.style.display = 'block';
+      status.style.background = '#fff7ed';
+      status.style.color = '#d97706';
+      status.textContent = 'Restaurando backup...';
+      fetch('/api/v1/admin/backups/restore?key=' + encodeURIComponent(adminKey) + '&file=' + encodeURIComponent(filename), { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            status.style.background = '#dcfce7';
+            status.style.color = '#16a34a';
+            status.textContent = 'Restaurado: ' + data.message;
+            loadBackups();
+          } else {
+            status.style.background = '#fef2f2';
+            status.style.color = '#dc2626';
+            status.textContent = 'Error: ' + data.message;
+          }
+          setTimeout(() => { status.style.display = 'none'; }, 5000);
+        })
+        .catch(() => {
+          status.style.background = '#fef2f2';
+          status.style.color = '#dc2626';
+          status.textContent = 'Error al restaurar';
         });
     }
     function downloadLiveDb() {

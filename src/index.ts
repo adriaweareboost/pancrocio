@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats, saveAuditTiming, getTimingStats, startBackupScheduler, setBackupDbPath, createBackup, listBackups, getBackupFile, exportDatabase } from './services/database.js';
+import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats, saveAuditTiming, getTimingStats, startBackupScheduler, setBackupDbPath, createBackup, listBackups, getBackupFile, exportDatabase, restoreFromBackup } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
 import { runPipeline } from './services/pipeline.js';
@@ -583,6 +583,22 @@ async function main() {
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="croagent-live-${ts}.db"`);
     res.send(data);
+  });
+
+  app.post('/api/v1/admin/backups/restore', async (req, res) => {
+    const adminKey = process.env.ADMIN_KEY;
+    if (!adminKey || req.query.key !== adminKey) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const filename = req.query.file as string;
+    if (!filename) {
+      return res.status(400).json({ error: 'Missing file parameter' });
+    }
+    const result = await restoreFromBackup(filename);
+    if (!result.ok) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
   });
 
   app.get('/api/v1/admin/timings', (req, res) => {
