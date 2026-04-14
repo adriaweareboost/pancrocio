@@ -360,6 +360,7 @@ async function main() {
 
   // Check audit status
   app.get('/api/v1/audit/:id', (req, res) => {
+    if (!/^[a-f0-9-]{36}$/.test(req.params.id)) return res.status(400).json({ error: 'Invalid audit ID' });
     const audit = getAudit(req.params.id);
     if (!audit) {
       return res.status(404).json({ error: 'Audit not found', code: 'NOT_FOUND' });
@@ -383,25 +384,24 @@ async function main() {
   // Send verification code (re-send) — rate limited: 3/hour per audit
   app.post('/api/v1/audit/:id/send-code', sendCodeRateLimit, (req, res) => {
     const id = req.params.id as string;
+    if (!/^[a-f0-9-]{36}$/.test(id)) return res.status(400).json({ error: 'Invalid audit ID' });
     const audit = getAudit(id);
     if (!audit) {
       return res.status(404).json({ error: 'Audit not found', code: 'NOT_FOUND' });
     }
     const email = getLeadEmail(id);
-    // Generate new code
     const newCode = String(crypto.randomInt(100000, 999999));
-    const leadResult = getAudit(id);
-    if (leadResult) {
-      const leadId = leadResult.lead_id as string;
-      setVerifyCode(leadId, newCode);
-      saveDatabase(DB_PATH);
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`[Verify] Re-sent code for ${id} — email: ${email} — code: ${newCode}`);
-      } else {
-        console.log(`[Verify] Re-sent code for ${id} — ${email ? hashEmail(email) : 'unknown'}`);
-      }
-      if (email) sendVerifyCodeEmail(email, newCode, 'es').catch(() => {});
+    const leadId = audit.lead_id as string;
+    setVerifyCode(leadId, newCode);
+    saveDatabase(DB_PATH);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[Verify] Re-sent code for ${id} — email: ${email} — code: ${newCode}`);
+    } else {
+      console.log(`[Verify] Re-sent code for ${id} — ${email ? hashEmail(email) : 'unknown'}`);
     }
+    // Use the audit's original language instead of hardcoded 'es'
+    const auditLang = normalizeLangCode((req.body?.lang as string) || 'es');
+    if (email) sendVerifyCodeEmail(email, newCode, auditLang).catch(() => {});
     res.json({ ok: true, message: 'Verification code sent to your email' });
   });
 
@@ -546,43 +546,34 @@ async function main() {
     res.json({ status: 'ok', version: '0.1.0' });
   });
 
-  // Admin dashboard API (protected by ADMIN_KEY env var)
-  app.get('/api/v1/admin/leads', (req, res) => {
+  // ─── Admin middleware (shared auth for all /api/v1/admin/* routes) ───
+  app.use('/api/v1/admin/', (req, res, next) => {
     const adminKey = process.env.ADMIN_KEY;
     if (!adminKey || req.query.key !== adminKey) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
+    next();
+  });
+
+  app.get('/api/v1/admin/leads', (_req, res) => {
     const stats = getLeadStats();
     const leads = getAllLeads(100);
     res.json({ stats, leads });
   });
 
-  // Admin: purge all data (audits, leads, cache)
-  app.post('/api/v1/admin/purge', (req, res) => {
-    const adminKey = process.env.ADMIN_KEY;
-    if (!adminKey || req.query.key !== adminKey) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+  app.post('/api/v1/admin/purge', (_req, res) => {
     purgeAllAudits();
     saveDatabase(DB_PATH);
     res.json({ ok: true, message: 'All audits, leads, and cache purged.' });
   });
 
-  // ─── Backup endpoints ───
+  // ─── Backup endpoints (all protected by admin middleware above) ───
 
-  app.get('/api/v1/admin/backups', (req, res) => {
-    const adminKey = process.env.ADMIN_KEY;
-    if (!adminKey || req.query.key !== adminKey) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+  app.get('/api/v1/admin/backups', (_req, res) => {
     res.json({ backups: listBackups() });
   });
 
-  app.post('/api/v1/admin/backups/create', async (req, res) => {
-    const adminKey = process.env.ADMIN_KEY;
-    if (!adminKey || req.query.key !== adminKey) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+  app.post('/api/v1/admin/backups/create', async (_req, res) => {
     try {
       const filename = await createBackup();
       res.json({ ok: true, filename });
@@ -592,85 +583,59 @@ async function main() {
   });
 
   app.get('/api/v1/admin/backups/download', (req, res) => {
-    const adminKey = process.env.ADMIN_KEY;
-    if (!adminKey || req.query.key !== adminKey) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
     const filename = req.query.file as string;
     if (filename) {
-      // Download specific backup
+      if (!/^croagent-backup-[\w.-]+\.db$/.test(filename)) {
+        return res.status(400).json({ error: 'Invalid backup filename' });
+      }
       const data = getBackupFile(filename);
       if (!data) return res.status(404).json({ error: 'Backup not found' });
       res.setHeader('Content-Type', 'application/octet-stream');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       return res.send(data);
     }
-    // Download current live database
     const data = exportDatabase();
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="croagent-live-${ts}.db"`);
+    res.setHeader('Content-Disposition', `attachment; filename="scanboost-live-${ts}.db"`);
     res.send(data);
   });
 
   app.post('/api/v1/admin/backups/restore', async (req, res) => {
-    const adminKey = process.env.ADMIN_KEY;
-    if (!adminKey || req.query.key !== adminKey) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
     const filename = req.query.file as string;
-    if (!filename) {
-      return res.status(400).json({ error: 'Missing file parameter' });
+    if (!filename || !/^croagent-backup-[\w.-]+\.db$/.test(filename)) {
+      return res.status(400).json({ error: 'Invalid or missing backup filename' });
     }
     const result = await restoreFromBackup(filename);
-    if (!result.ok) {
-      return res.status(400).json(result);
-    }
+    if (!result.ok) return res.status(400).json(result);
     res.json(result);
   });
 
-  app.get('/api/v1/admin/timings', (req, res) => {
-    const adminKey = process.env.ADMIN_KEY;
-    if (!adminKey || req.query.key !== adminKey) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+  app.get('/api/v1/admin/timings', (_req, res) => {
     res.json(getTimingStats());
   });
 
-  app.get('/api/v1/admin/errors', (req, res) => {
-    const adminKey = process.env.ADMIN_KEY;
-    if (!adminKey || req.query.key !== adminKey) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+  app.get('/api/v1/admin/errors', (_req, res) => {
     const errors = getErrorLog(100);
     const stats = getErrorStats();
     res.json({ stats, errors });
   });
 
   app.delete('/api/v1/admin/errors/:id', (req, res) => {
-    const adminKey = process.env.ADMIN_KEY;
-    if (!adminKey || req.query.key !== adminKey) {
-      return res.status(401).json({ error: 'Unauthorized' });
+    const errorId = Number(req.params.id);
+    if (!Number.isInteger(errorId) || errorId <= 0) {
+      return res.status(400).json({ error: 'Invalid error ID' });
     }
-    deleteError(Number(req.params.id));
+    deleteError(errorId);
     saveDatabase(DB_PATH);
     res.json({ ok: true });
   });
 
-  app.get('/api/v1/admin/analytics', (req, res) => {
-    const adminKey = process.env.ADMIN_KEY;
-    if (!adminKey || req.query.key !== adminKey) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    const analytics = getAnalytics();
-    res.json(analytics);
+  app.get('/api/v1/admin/analytics', (_req, res) => {
+    res.json(getAnalytics());
   });
 
-  app.post('/api/v1/admin/reset-rate-limits', (req, res) => {
-    const adminKey = process.env.ADMIN_KEY;
-    if (!adminKey || req.query.key !== adminKey) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+  app.post('/api/v1/admin/reset-rate-limits', (_req, res) => {
     const cleared = resetRateLimits();
     res.json({ ok: true, message: `Cleared ${cleared} rate limit buckets.` });
   });
