@@ -123,7 +123,6 @@
 
   <div id="dashboard" style="display:none">
     <div class="header">
-      <img src="/favicon-boost.png" alt="Boost" width="32" height="32">
       <h1>Scan&amp;<span>Boost</span></h1>
     </div>
     <div class="tabs">
@@ -178,10 +177,10 @@
 
       <!-- BACKUPS TAB -->
       <div id="tab-backups" class="tab-content">
-        <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;">
-          <button class="btn-primary" onclick="createBackupNow()">Crear backup ahora</button>
-          <button class="btn-secondary" onclick="downloadLiveDb()">Descargar BD actual</button>
-          <button class="btn-secondary" onclick="loadBackups()">Actualizar</button>
+        <div style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;">
+          <button onclick="createBackupNow()" style="padding:10px 22px;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#22c55e,#16a34a);color:white;box-shadow:0 2px 8px rgba(34,197,94,0.3);transition:all 0.2s;">Crear backup ahora</button>
+          <button onclick="downloadLiveDb()" style="padding:10px 22px;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;box-shadow:0 2px 8px rgba(59,130,246,0.3);transition:all 0.2s;">Descargar BD actual</button>
+          <button onclick="loadBackups()" style="padding:10px 22px;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:#f3f4f6;color:#070F2D;transition:all 0.2s;">Actualizar</button>
         </div>
         <div id="backupStatus" style="display:none;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:13px;font-weight:600;"></div>
         <div class="card">
@@ -385,7 +384,7 @@
             <td style="font-family:monospace;font-size:12px">${esc(b.filename)}</td>
             <td>${sizeKb} KB</td>
             <td class="date-cell">${esc(b.date)}</td>
-            <td><a href="/api/v1/admin/backups/download?key=${encodeURIComponent(adminKey)}&file=${encodeURIComponent(b.filename)}" class="btn-secondary" style="display:inline-block;padding:4px 12px;border-radius:8px;text-decoration:none;font-size:11px">Descargar</a></td>
+            <td><a href="/api/v1/admin/backups/download?key=${encodeURIComponent(adminKey)}&file=${encodeURIComponent(b.filename)}" style="display:inline-block;padding:6px 16px;border-radius:10px;text-decoration:none;font-size:12px;font-weight:600;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;box-shadow:0 2px 6px rgba(59,130,246,0.25);transition:all 0.2s;">Descargar</a></td>
           </tr>`;
         }).join('') || '';
       });
