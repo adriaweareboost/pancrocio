@@ -200,7 +200,7 @@
         <div class="card"><h2>Errores recientes</h2>
           <div class="table-wrap" style="box-shadow:none;">
             <table>
-              <thead><tr><th>Fase</th><th>Error</th><th>URL</th><th>Fecha</th></tr></thead>
+              <thead><tr><th>Fase</th><th>Error</th><th>URL</th><th>Fecha</th><th></th></tr></thead>
               <tbody id="errorBody"></tbody>
             </table>
             <div class="empty" id="emptyErrors" style="display:none">Sin errores registrados</div>
@@ -366,9 +366,15 @@
         document.getElementById('errorBody').innerHTML = errors.map(e => {
           const d = new Date(e.created_at).toLocaleString('es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
           const u = (e.url||'').replace(/^https?:\/\//,'').slice(0,25);
-          return `<tr><td><span class="badge-no">${esc(e.phase)}</span></td><td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.error_message)}</td><td class="url-cell">${esc(u)}</td><td class="date-cell">${d}</td></tr>`;
+          return `<tr><td><span class="badge-no">${esc(e.phase)}</span></td><td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.error_message)}</td><td class="url-cell">${esc(u)}</td><td class="date-cell">${d}</td><td><button onclick="deleteError(${e.id})" style="padding:4px 12px;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;background:#fef2f2;color:#dc2626;transition:all 0.2s;">Eliminar</button></td></tr>`;
         }).join('');
       });
+    }
+
+    function deleteError(id) {
+      fetch('/api/v1/admin/errors/' + id + '?key=' + encodeURIComponent(adminKey), { method: 'DELETE' })
+        .then(r => r.json())
+        .then(() => { window._errorsLoaded = false; loadErrors(); });
     }
 
     // ── BACKUPS ──

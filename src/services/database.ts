@@ -477,6 +477,11 @@ export function getErrorLog(limit = 50): Record<string, unknown>[] {
   });
 }
 
+export function deleteError(id: number): boolean {
+  db.run(`DELETE FROM error_log WHERE id = ?`, [id]);
+  return true;
+}
+
 export function getErrorStats(): { phase: string; count: number; lastSeen: string }[] {
   const result = db.exec(`
     SELECT phase, COUNT(*) as cnt, MAX(created_at) as last_seen
