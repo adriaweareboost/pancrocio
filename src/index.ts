@@ -33,7 +33,7 @@ app.use('/api/', (req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const SITE_ORIGIN = (process.env.SITE_ORIGIN || 'https://pancrocio.weareboost.online').replace(/\/$/, '');
+const SITE_ORIGIN = (process.env.SITE_ORIGIN || 'https://scanandboost.weareboost.online').replace(/\/$/, '');
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'croagent.db');
 
 // In-memory audit status tracking (auto-cleanup after 30 min)
