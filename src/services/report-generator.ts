@@ -290,7 +290,7 @@ function renderSidebar(ui: ReportUiStrings): string {
         </div>
         <div class="field">
           <label for="sf_email">${escapeHtml(ui.formEmailLabel)}</label>
-          <input type="email" id="sf_email" name="email" placeholder="tu@empresa.com" autocomplete="email" required>
+          <input type="email" id="sf_email" name="email" placeholder="you@company.com" autocomplete="email" required>
         </div>
         <div class="field">
           <label for="sf_message">${escapeHtml(ui.formMessageLabel)}</label>
@@ -339,7 +339,7 @@ function renderMobilePopup(ui: ReportUiStrings): string {
       </div>
       <div class="field">
         <label for="mf_email">${escapeHtml(ui.formEmailLabel)}</label>
-        <input type="email" id="mf_email" name="email" placeholder="tu@empresa.com" autocomplete="email" required>
+        <input type="email" id="mf_email" name="email" placeholder="you@company.com" autocomplete="email" required>
       </div>
       <div class="field">
         <label for="mf_message">${escapeHtml(ui.formMessageLabel)}</label>
@@ -376,7 +376,7 @@ function renderContactCta(ui: ReportUiStrings): string {
               </div>
               <div class="field">
                 <label for="cf_email">${escapeHtml(ui.formEmailLabel)}</label>
-                <input type="email" id="cf_email" name="email" placeholder="tu@empresa.com" autocomplete="email" required>
+                <input type="email" id="cf_email" name="email" placeholder="you@company.com" autocomplete="email" required>
               </div>
               <div class="field">
                 <label for="cf_message">${escapeHtml(ui.formMessageLabel)}</label>
