@@ -533,8 +533,8 @@ export function generateReportHtml(input: ReportInput): string {
       ${escapeHtml(ui.downloadPdfButton)}
     </a>` : ''}
     <div style="max-width:800px;margin:0 auto">
-      <div aria-hidden="true" style="margin-bottom:12px">${BRAND_SVG}</div>
-      <h1 style="font-size:32px;font-weight:800;margin-bottom:6px;letter-spacing:-0.5px">Scan&amp;<span style="color:#EC5F29">Boost</span> <span style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">${escapeHtml(ui.reportSubtitle)}</span></h1>
+      <a href="https://scanandboost.weareboost.online" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block;margin-bottom:12px" aria-hidden="true">${BRAND_SVG}</a>
+      <h1 style="font-size:32px;font-weight:800;margin-bottom:6px;letter-spacing:-0.5px"><a href="https://scanandboost.weareboost.online" target="_blank" rel="noopener" style="color:white;text-decoration:none">Scan&amp;<span style="color:#EC5F29">Boost</span></a> <span style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">${escapeHtml(ui.reportSubtitle)}</span></h1>
       <p style="font-size:14px;opacity:0.7;margin-bottom:4px">${escapeHtml(ui.reportSubtitle)}</p>
       <p style="font-size:13px;opacity:0.5;word-break:break-all">${url} &middot; <time datetime="${safeDate}">${safeDate}</time></p>
     </div>
