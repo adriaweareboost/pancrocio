@@ -316,6 +316,10 @@ export function recoverOrphanedAudits(): number {
   return count;
 }
 
+export function resetLeadVerification(leadId: string): void {
+  db.run(`UPDATE leads SET email_verified = 0 WHERE id = ?`, [leadId]);
+}
+
 export function setVerifyCode(leadId: string, code: string): void {
   db.run(`UPDATE leads SET verify_code = ? WHERE id = ?`, [code, leadId]);
 }
@@ -336,8 +340,9 @@ export function verifyEmailCode(auditId: string, code: string): boolean {
 }
 
 export function isEmailVerified(auditId: string): boolean {
+  // Check the MOST RECENT lead for this audit — new visitors must verify even if a previous lead did
   const result = db.exec(
-    `SELECT l.email_verified FROM leads l JOIN audits a ON l.audit_id = a.id WHERE a.id = ?`,
+    `SELECT l.email_verified FROM leads l WHERE l.audit_id = ? ORDER BY l.created_at DESC LIMIT 1`,
     [auditId],
   );
   if (result.length === 0 || result[0].values.length === 0) return false;
