@@ -937,7 +937,7 @@ function buildVerifyPage(auditId: string, url: string, score: number | null, lan
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Verificar Email — Scan&amp;Boost</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" href="/favicon-boost.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
   <style>
@@ -962,8 +962,8 @@ function buildVerifyPage(auditId: string, url: string, score: number | null, lan
 </head>
 <body>
   <div class="verify-card">
-    <div class="logo"><img src="/scanboost.svg" alt="Scan&amp;Boost" width="80" height="96"></div>
-    <h1 style="font-size:24px;color:#070F2D">¡Tu informe está listo!</h1>
+    <h1 style="font-size:28px;color:#070F2D;margin-bottom:4px">Scan&amp;<span style="color:#EC5F29">Boost</span></h1>
+    <p style="font-size:16px;color:#070F2D;font-weight:600;margin-top:12px">¡Tu informe está listo!</p>
     <p class="url">${escapeHtml(url)}</p>
     ${scoreDisplay}
     <p class="subtitle">Introduce el código de 6 dígitos que te hemos enviado por email para desbloquear tu informe.</p>
