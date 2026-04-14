@@ -185,9 +185,7 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
 // ─── CORS ───
 
 const ALLOWED_ORIGINS = new Set([
-  'https://pancrocio.weareboost.online',
   'https://scanandboost.weareboost.online',
-  'https://pancrocio-production.up.railway.app',
   'https://www.weareboost.online',
   'https://weareboost.online',
 ]);
