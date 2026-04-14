@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>PanCROcio — Admin Dashboard</title>
+  <title>PanCROcio — Admin</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
@@ -17,15 +17,25 @@
     .header img { width: 40px; height: 48px; }
     .header h1 { font-size: 20px; font-weight: 800; }
     .header h1 span { color: #EC5F29; }
-    .header .badge { background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 100px; font-size: 11px; margin-left: auto; }
+
+    .tabs { background: #070F2D; padding: 0 24px; display: flex; gap: 4px; border-top: 1px solid rgba(255,255,255,0.1); }
+    .tab { padding: 12px 20px; color: rgba(255,255,255,0.5); font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+    .tab:hover { color: rgba(255,255,255,0.8); }
+    .tab.active { color: white; border-bottom-color: #EC5F29; }
 
     .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
 
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .stat-card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(7,15,45,0.06); text-align: center; }
-    .stat-card .number { font-size: 36px; font-weight: 800; color: #070F2D; font-family: 'Plus Jakarta Sans', sans-serif; }
-    .stat-card .label { font-size: 13px; color: #9ca3af; margin-top: 4px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 2px 8px rgba(7,15,45,0.06); text-align: center; }
+    .stat-card .number { font-size: 32px; font-weight: 800; color: #070F2D; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .stat-card .label { font-size: 12px; color: #9ca3af; margin-top: 4px; }
     .stat-card.highlight .number { color: #EC5F29; }
+    .stat-card .unit { font-size: 14px; font-weight: 400; color: #9ca3af; }
+
+    .card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(7,15,45,0.06); margin-bottom: 24px; }
+    .card h2 { font-size: 16px; margin-bottom: 16px; color: #070F2D; }
 
     .toolbar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
     .toolbar input { flex: 1; min-width: 200px; padding: 10px 16px; border: 1px solid #e2e4ea; border-radius: 10px; font-size: 14px; outline: none; }
@@ -43,184 +53,315 @@
     .badge-ok { background: #dcfce7; color: #16a34a; padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; }
     .badge-no { background: #fef2f2; color: #dc2626; padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; }
     .badge-pending { background: #fff7ed; color: #ea580c; padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; }
+    .badge-info { background: #eff6ff; color: #2563eb; padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; }
     .score { font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif; }
     .score-good { color: #22c55e; }
     .score-ok { color: #EC5F29; }
     .score-bad { color: #dc2626; }
-    .url-cell { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .url-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .url-cell a { color: #EC5F29; text-decoration: none; }
     .date-cell { white-space: nowrap; color: #9ca3af; font-size: 12px; }
+
+    /* Analytics */
+    .finding-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f3f4f6; }
+    .finding-row:last-child { border-bottom: none; }
+    .finding-rank { width: 28px; height: 28px; border-radius: 50%; background: #070F2D; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; font-family: 'Plus Jakarta Sans', sans-serif; flex-shrink: 0; }
+    .finding-rank.top3 { background: linear-gradient(135deg, #dd974b, #db501a); }
+    .finding-info { flex: 1; min-width: 0; }
+    .finding-title { font-weight: 600; font-size: 13px; color: #070F2D; }
+    .finding-meta { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+    .finding-count { font-weight: 800; font-size: 18px; color: #070F2D; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .finding-count small { font-size: 11px; font-weight: 400; color: #9ca3af; }
+
+    .cat-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f3f4f6; }
+    .cat-row:last-child { border-bottom: none; }
+    .cat-name { width: 140px; font-weight: 600; font-size: 12px; flex-shrink: 0; }
+    .cat-bar-wrap { flex: 1; background: #f3f4f6; border-radius: 8px; height: 24px; overflow: hidden; }
+    .cat-bar { height: 100%; border-radius: 8px; display: flex; align-items: center; padding-left: 8px; font-size: 11px; font-weight: 700; color: white; transition: width 0.6s; }
+
+    /* Timing bars */
+    .timing-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
+    .timing-row:last-child { border-bottom: none; }
+    .timing-label { width: 100px; font-weight: 600; font-size: 12px; }
+    .timing-bar-wrap { flex: 1; background: #f3f4f6; border-radius: 8px; height: 28px; overflow: hidden; }
+    .timing-bar { height: 100%; border-radius: 8px; display: flex; align-items: center; padding-left: 10px; font-size: 12px; font-weight: 700; color: white; transition: width 0.6s; }
+
+    .sev-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .sev-card { text-align: center; padding: 16px; border-radius: 12px; }
+    .sev-card .count { font-size: 28px; font-weight: 800; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .sev-card .label { font-size: 12px; margin-top: 4px; font-weight: 600; }
+    .sev-critical { background: #fef2f2; } .sev-critical .count, .sev-critical .label { color: #dc2626; }
+    .sev-warning { background: #fff7ed; } .sev-warning .count, .sev-warning .label { color: #ea580c; }
+    .sev-info { background: #eff6ff; } .sev-info .count, .sev-info .label { color: #2563eb; }
+
+    .empty { text-align: center; padding: 48px; color: #9ca3af; font-size: 14px; }
 
     .login { display: flex; align-items: center; justify-content: center; min-height: 80vh; }
     .login-card { background: white; border-radius: 16px; padding: 40px; box-shadow: 0 4px 24px rgba(7,15,45,0.10); max-width: 400px; width: 100%; text-align: center; }
     .login-card img { width: 60px; margin-bottom: 12px; }
     .login-card h2 { margin-bottom: 20px; color: #070F2D; }
     .login-card input { width: 100%; padding: 12px 16px; border: 1px solid #e2e4ea; border-radius: 10px; font-size: 16px; margin-bottom: 16px; outline: none; text-align: center; font-family: monospace; }
-    .login-card button { width: 100%; }
+    .login-card button { width: 100%; padding: 14px; font-size: 16px; border-radius: 100px; border: none; cursor: pointer; font-weight: 700; color: white; background: linear-gradient(90deg, #dd974b, #db501a); }
 
-    .empty { text-align: center; padding: 60px 20px; color: #9ca3af; }
-    .empty-icon { font-size: 48px; margin-bottom: 12px; }
-
-    @media (max-width: 600px) {
-      .container { padding: 12px; }
+    @media (max-width: 768px) {
+      .tabs { overflow-x: auto; }
       .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-      .stat-card { padding: 16px; }
-      .stat-card .number { font-size: 28px; }
+      .sev-grid { grid-template-columns: 1fr; }
+      .cat-name, .timing-label { width: 80px; font-size: 10px; }
     }
   </style>
 </head>
 <body>
-  <!-- Login screen -->
   <div id="loginScreen" class="login">
     <div class="login-card">
       <img src="/pancrocio.svg" alt="PanCROcio">
       <h2>Admin Dashboard</h2>
       <input type="password" id="keyInput" placeholder="Admin Key" autofocus>
-      <button class="btn-primary" onclick="login()" style="padding:14px;font-size:16px;border-radius:100px;border:none;width:100%;cursor:pointer;font-weight:700;color:white;background:linear-gradient(90deg,#dd974b,#db501a)">Acceder</button>
+      <button onclick="login()">Acceder</button>
       <p id="loginError" style="color:#dc2626;font-size:13px;margin-top:12px;display:none">Clave incorrecta</p>
     </div>
   </div>
 
-  <!-- Dashboard -->
   <div id="dashboard" style="display:none">
     <div class="header">
-      <img src="/pancrocio.svg" alt="">
+      <img src="/pancrocio.svg" alt="" onerror="this.style.display='none'">
       <h1>Pan<span>CRO</span>cio</h1>
-      <span class="badge" style="cursor:pointer;" onclick="window.location='/analytics'">Analytics</span>
-      <span class="badge" style="opacity:0.6;">Leads</span>
+    </div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('leads')">Leads</div>
+      <div class="tab" onclick="switchTab('analytics')">Analytics</div>
+      <div class="tab" onclick="switchTab('performance')">Performance</div>
+      <div class="tab" onclick="switchTab('errors')">Errors</div>
     </div>
 
     <div class="container">
-      <div class="stats" id="statsGrid"></div>
-
-      <div class="toolbar">
-        <input type="text" id="searchInput" placeholder="Buscar por email o URL..." oninput="filterTable()">
-        <button class="btn-secondary" onclick="loadData()">Actualizar</button>
-        <button class="btn-danger" onclick="purgeData()">Purgar todo</button>
+      <!-- LEADS TAB -->
+      <div id="tab-leads" class="tab-content active">
+        <div class="stats" id="leadsStats"></div>
+        <div class="toolbar">
+          <input type="text" id="searchInput" placeholder="Buscar por email o URL..." oninput="filterTable()">
+          <button class="btn-secondary" onclick="loadLeads()">Actualizar</button>
+          <button class="btn-danger" onclick="purgeData()">Purgar todo</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Email</th><th>URL</th><th>Score</th><th>Estado</th><th>Verificado</th><th>Fecha</th><th>Informe</th></tr></thead>
+            <tbody id="leadsBody"></tbody>
+          </table>
+          <div class="empty" id="emptyLeads" style="display:none">No hay leads todavia</div>
+        </div>
       </div>
 
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>URL</th>
-              <th>Score</th>
-              <th>Estado</th>
-              <th>Verificado</th>
-              <th>Fecha</th>
-              <th>Informe</th>
-            </tr>
-          </thead>
-          <tbody id="leadsBody"></tbody>
-        </table>
-        <div class="empty" id="emptyState" style="display:none">
-          <div class="empty-icon">📊</div>
-          <p>No hay leads todavía</p>
+      <!-- ANALYTICS TAB -->
+      <div id="tab-analytics" class="tab-content">
+        <div class="stats" id="analyticsKpis"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+          <div class="card"><h2>Errores mas comunes</h2><div id="topFindings"></div></div>
+          <div class="card"><h2>Severidad</h2><div class="sev-grid" id="sevGrid"></div></div>
+        </div>
+        <div class="card"><h2>Rendimiento por categoria</h2><div id="catStats"></div></div>
+      </div>
+
+      <!-- PERFORMANCE TAB -->
+      <div id="tab-performance" class="tab-content">
+        <div class="stats" id="perfStats"></div>
+        <div class="card"><h2>Tiempo medio por fase</h2><div id="timingBars"></div></div>
+        <div class="card"><h2>Ultimas auditorias</h2>
+          <div class="table-wrap" style="box-shadow:none;">
+            <table>
+              <thead><tr><th>URL</th><th>Total</th><th>Scrape</th><th>Pipeline</th><th>Translation</th><th>Report</th><th>Fecha</th></tr></thead>
+              <tbody id="timingBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ERRORS TAB -->
+      <div id="tab-errors" class="tab-content">
+        <div class="stats" id="errorStats"></div>
+        <div class="card"><h2>Errores recientes</h2>
+          <div class="table-wrap" style="box-shadow:none;">
+            <table>
+              <thead><tr><th>Fase</th><th>Error</th><th>URL</th><th>Fecha</th></tr></thead>
+              <tbody id="errorBody"></tbody>
+            </table>
+            <div class="empty" id="emptyErrors" style="display:none">Sin errores registrados</div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    var adminKey = '';
+    let adminKey = localStorage.getItem('pancrocio_admin_key') || '';
+    const CAT_LABELS = { visualHierarchy:'Visual Hierarchy', uxHeuristics:'UX Heuristics', copyMessaging:'Copy & Messaging', trustSignals:'Trust Signals', mobileExperience:'Mobile Experience', performance:'Performance' };
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function fmtMs(ms) { return ms >= 1000 ? (ms/1000).toFixed(1)+'s' : ms+'ms'; }
+    function barColor(v) { return v >= 80 ? '#22c55e' : v >= 60 ? '#84cc16' : v >= 40 ? '#EC5F29' : '#dc2626'; }
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', t.textContent.toLowerCase().includes(name.slice(0,4))));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-' + name).classList.add('active');
+      if (name === 'analytics' && !window._analyticsLoaded) loadAnalytics();
+      if (name === 'performance' && !window._perfLoaded) loadTimings();
+      if (name === 'errors' && !window._errorsLoaded) loadErrors();
+    }
 
     function login() {
       adminKey = document.getElementById('keyInput').value.trim();
       if (!adminKey) return;
-      fetch('/api/v1/admin/leads?key=' + encodeURIComponent(adminKey))
-        .then(function(r) {
-          if (!r.ok) throw new Error('Unauthorized');
-          return r.json();
-        })
-        .then(function(data) {
-          document.getElementById('loginScreen').style.display = 'none';
-          document.getElementById('dashboard').style.display = 'block';
-          renderData(data);
-        })
-        .catch(function() {
-          document.getElementById('loginError').style.display = 'block';
-        });
+      localStorage.setItem('pancrocio_admin_key', adminKey);
+      fetchApi('leads').then(data => {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        renderLeads(data);
+      }).catch(() => {
+        document.getElementById('loginError').style.display = 'block';
+        localStorage.removeItem('pancrocio_admin_key');
+      });
+    }
+    document.getElementById('keyInput').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+    function fetchApi(endpoint) {
+      return fetch('/api/v1/admin/' + endpoint + '?key=' + encodeURIComponent(adminKey))
+        .then(r => { if (!r.ok) throw new Error('Unauthorized'); return r.json(); });
     }
 
-    document.getElementById('keyInput').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') login();
-    });
-
-    function loadData() {
-      fetch('/api/v1/admin/leads?key=' + encodeURIComponent(adminKey))
-        .then(function(r) { return r.json(); })
-        .then(renderData);
+    // ── LEADS ──
+    function loadLeads() { fetchApi('leads').then(renderLeads); }
+    function renderLeads(data) {
+      const s = data.stats || {};
+      document.getElementById('leadsStats').innerHTML = `
+        <div class="stat-card highlight"><div class="number">${s.total||0}</div><div class="label">Total Leads</div></div>
+        <div class="stat-card"><div class="number">${s.verified||0}</div><div class="label">Verificados</div></div>
+        <div class="stat-card"><div class="number">${s.completed||0}</div><div class="label">Auditorias</div></div>
+        <div class="stat-card"><div class="number">${s.total ? Math.round((s.verified/s.total)*100) : 0}%</div><div class="label">Tasa verificacion</div></div>`;
+      window._allLeads = data.leads || [];
+      renderTable(window._allLeads);
     }
-
-    function renderData(data) {
-      var stats = data.stats || {};
-      document.getElementById('statsGrid').innerHTML = `
-        <div class="stat-card highlight"><div class="number">${stats.total || 0}</div><div class="label">Total Leads</div></div>
-        <div class="stat-card"><div class="number">${stats.verified || 0}</div><div class="label">Verificados</div></div>
-        <div class="stat-card"><div class="number">${stats.completed || 0}</div><div class="label">Auditorías</div></div>
-        <div class="stat-card"><div class="number">${stats.total ? Math.round((stats.verified / stats.total) * 100) : 0}%</div><div class="label">Tasa verificación</div></div>
-      `;
-
-      var leads = data.leads || [];
-      window._allLeads = leads;
-      renderTable(leads);
-    }
-
     function renderTable(leads) {
-      var tbody = document.getElementById('leadsBody');
-      var empty = document.getElementById('emptyState');
-
-      if (leads.length === 0) {
-        tbody.innerHTML = '';
-        empty.style.display = 'block';
-        return;
-      }
-      empty.style.display = 'none';
-
-      tbody.innerHTML = leads.map(function(l) {
-        var score = l.global_score;
-        var scoreClass = score >= 80 ? 'score-good' : score >= 60 ? 'score-ok' : 'score-bad';
-        var statusBadge = l.audit_status === 'completed' ? '<span class="badge-ok">Completado</span>'
-          : l.audit_status === 'failed' ? '<span class="badge-no">Fallido</span>'
-          : '<span class="badge-pending">' + (l.audit_status || 'Pendiente') + '</span>';
-        var verifiedBadge = l.email_verified ? '<span class="badge-ok">Sí</span>' : '<span class="badge-no">No</span>';
-        var date = l.created_at ? new Date(l.created_at).toLocaleString('es-ES', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '-';
-        var reportLink = l.audit_id && l.audit_status === 'completed'
-          ? '<a href="/api/v1/audit/' + l.audit_id + '/report" target="_blank" style="color:#EC5F29">Ver</a>'
-          : '-';
-
-        return '<tr>' +
-          '<td>' + esc(l.email || '') + '</td>' +
-          '<td class="url-cell"><a href="' + esc(l.url || '') + '" target="_blank">' + esc(l.url || '') + '</a></td>' +
-          '<td><span class="score ' + scoreClass + '">' + (score != null ? score : '-') + '</span></td>' +
-          '<td>' + statusBadge + '</td>' +
-          '<td>' + verifiedBadge + '</td>' +
-          '<td class="date-cell">' + date + '</td>' +
-          '<td>' + reportLink + '</td>' +
-          '</tr>';
+      const tbody = document.getElementById('leadsBody');
+      document.getElementById('emptyLeads').style.display = leads.length ? 'none' : 'block';
+      tbody.innerHTML = leads.map(l => {
+        const sc = l.global_score, scCls = sc>=80?'score-good':sc>=60?'score-ok':'score-bad';
+        const st = l.audit_status==='completed'?'<span class="badge-ok">OK</span>':l.audit_status==='failed'?'<span class="badge-no">Fail</span>':'<span class="badge-pending">'+(l.audit_status||'...')+'</span>';
+        const v = l.email_verified?'<span class="badge-ok">Si</span>':'<span class="badge-no">No</span>';
+        const d = l.created_at ? new Date(l.created_at).toLocaleString('es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '-';
+        const rpt = l.audit_id&&l.audit_status==='completed'?'<a href="/api/v1/audit/'+l.audit_id+'/report" target="_blank" style="color:#EC5F29">Ver</a>':'-';
+        return '<tr><td>'+esc(l.email||'')+'</td><td class="url-cell"><a href="'+esc(l.url||'')+'" target="_blank">'+esc(l.url||'')+'</a></td><td><span class="score '+scCls+'">'+(sc!=null?sc:'-')+'</span></td><td>'+st+'</td><td>'+v+'</td><td class="date-cell">'+d+'</td><td>'+rpt+'</td></tr>';
       }).join('');
     }
-
     function filterTable() {
-      var q = document.getElementById('searchInput').value.toLowerCase();
-      var filtered = (window._allLeads || []).filter(function(l) {
-        return (l.email || '').toLowerCase().includes(q) || (l.url || '').toLowerCase().includes(q);
-      });
-      renderTable(filtered);
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      renderTable((window._allLeads||[]).filter(l => (l.email||'').toLowerCase().includes(q)||(l.url||'').toLowerCase().includes(q)));
     }
-
     function purgeData() {
-      if (!confirm('¿Seguro? Esto borrará TODOS los leads, auditorías y cache.')) return;
-      fetch('/api/v1/admin/purge?key=' + encodeURIComponent(adminKey), { method: 'POST' })
-        .then(function(r) { return r.json(); })
-        .then(function() { loadData(); });
+      if (!confirm('Borrar TODOS los datos?')) return;
+      fetch('/api/v1/admin/purge?key='+encodeURIComponent(adminKey),{method:'POST'}).then(()=>loadLeads());
     }
 
-    function esc(s) {
-      var d = document.createElement('div');
-      d.textContent = s;
-      return d.innerHTML;
+    // ── ANALYTICS ──
+    function loadAnalytics() {
+      fetchApi('analytics').then(data => {
+        window._analyticsLoaded = true;
+        const tf = data.severityDistribution.reduce((s,d)=>s+d.count,0);
+        document.getElementById('analyticsKpis').innerHTML = `
+          <div class="stat-card"><div class="number">${data.totalAudits}</div><div class="label">Auditorias</div></div>
+          <div class="stat-card highlight"><div class="number">${data.avgGlobalScore}</div><div class="label">Score medio</div></div>
+          <div class="stat-card"><div class="number">${tf}</div><div class="label">Findings totales</div></div>
+          <div class="stat-card"><div class="number">${data.topFindings.length}</div><div class="label">Errores unicos</div></div>`;
+
+        const sevMap = {}; data.severityDistribution.forEach(s => sevMap[s.severity]=s.count);
+        document.getElementById('sevGrid').innerHTML = `
+          <div class="sev-card sev-critical"><div class="count">${sevMap.critical||0}</div><div class="label">Critical</div></div>
+          <div class="sev-card sev-warning"><div class="count">${sevMap.warning||0}</div><div class="label">Warning</div></div>
+          <div class="sev-card sev-info"><div class="count">${sevMap.info||0}</div><div class="label">Info</div></div>`;
+
+        document.getElementById('topFindings').innerHTML = data.topFindings.length === 0
+          ? '<div class="empty">Sin datos</div>'
+          : data.topFindings.slice(0,10).map((f,i) => `
+            <div class="finding-row">
+              <div class="finding-rank ${i<3?'top3':''}">${i+1}</div>
+              <div class="finding-info">
+                <div class="finding-title">${esc(f.title)}</div>
+                <div class="finding-meta"><span class="badge-${f.severity}">${f.severity}</span> ${CAT_LABELS[f.category]||f.category}</div>
+              </div>
+              <div class="finding-count">${f.count}<small>x</small></div>
+            </div>`).join('');
+
+        document.getElementById('catStats').innerHTML = data.categoryStats.length === 0
+          ? '<div class="empty">Sin datos</div>'
+          : data.categoryStats.map(c => `
+            <div class="cat-row">
+              <div class="cat-name">${CAT_LABELS[c.category]||c.category}</div>
+              <div class="cat-bar-wrap"><div class="cat-bar" style="width:${Math.max(c.avgScore,5)}%;background:${barColor(c.avgScore)}">${c.avgScore}</div></div>
+            </div>`).join('');
+      });
+    }
+
+    // ── PERFORMANCE ──
+    function loadTimings() {
+      fetchApi('timings').then(data => {
+        window._perfLoaded = true;
+        document.getElementById('perfStats').innerHTML = `
+          <div class="stat-card highlight"><div class="number">${fmtMs(data.avgTotal)}</div><div class="label">Tiempo medio total</div></div>
+          <div class="stat-card"><div class="number">${fmtMs(data.avgScrape)}</div><div class="label">Scraping</div></div>
+          <div class="stat-card"><div class="number">${fmtMs(data.avgPipeline)}</div><div class="label">Pipeline IA</div></div>
+          <div class="stat-card"><div class="number">${fmtMs(data.avgTranslation)}</div><div class="label">Traduccion</div></div>
+          <div class="stat-card"><div class="number">${fmtMs(data.avgReport)}</div><div class="label">Report</div></div>
+          <div class="stat-card"><div class="number">${data.count}</div><div class="label">Total mediciones</div></div>`;
+
+        const maxMs = Math.max(data.avgScrape, data.avgPipeline, data.avgTranslation, data.avgReport, 1);
+        const phases = [
+          { label: 'Scraping', ms: data.avgScrape, color: '#3b82f6' },
+          { label: 'Pipeline IA', ms: data.avgPipeline, color: '#EC5F29' },
+          { label: 'Traduccion', ms: data.avgTranslation, color: '#8b5cf6' },
+          { label: 'Report', ms: data.avgReport, color: '#22c55e' },
+        ];
+        document.getElementById('timingBars').innerHTML = phases.map(p => `
+          <div class="timing-row">
+            <div class="timing-label">${p.label}</div>
+            <div class="timing-bar-wrap"><div class="timing-bar" style="width:${Math.max((p.ms/maxMs)*100,5)}%;background:${p.color}">${fmtMs(p.ms)}</div></div>
+          </div>`).join('');
+
+        document.getElementById('timingBody').innerHTML = data.recent.map(t => {
+          const u = t.url.replace(/^https?:\/\//,'').slice(0,30);
+          const d = new Date(t.created_at).toLocaleString('es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+          return `<tr><td class="url-cell">${esc(u)}</td><td><strong>${fmtMs(t.total_ms)}</strong></td><td>${fmtMs(t.scrape_ms)}</td><td>${fmtMs(t.pipeline_ms)}</td><td>${fmtMs(t.translation_ms)}</td><td>${fmtMs(t.report_ms)}</td><td class="date-cell">${d}</td></tr>`;
+        }).join('') || '<tr><td colspan="7" class="empty">Sin datos</td></tr>';
+      });
+    }
+
+    // ── ERRORS ──
+    function loadErrors() {
+      fetchApi('errors').then(data => {
+        window._errorsLoaded = true;
+        document.getElementById('errorStats').innerHTML = (data.stats||[]).map(s =>
+          `<div class="stat-card"><div class="number">${s.count}</div><div class="label">${esc(s.phase)}</div></div>`
+        ).join('') || '<div class="stat-card"><div class="number">0</div><div class="label">Errores</div></div>';
+
+        const errors = data.errors || [];
+        document.getElementById('emptyErrors').style.display = errors.length ? 'none' : 'block';
+        document.getElementById('errorBody').innerHTML = errors.map(e => {
+          const d = new Date(e.created_at).toLocaleString('es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+          const u = (e.url||'').replace(/^https?:\/\//,'').slice(0,25);
+          return `<tr><td><span class="badge-no">${esc(e.phase)}</span></td><td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.error_message)}</td><td class="url-cell">${esc(u)}</td><td class="date-cell">${d}</td></tr>`;
+        }).join('');
+      });
+    }
+
+    // Auto-login if key stored
+    if (adminKey) {
+      fetchApi('leads').then(data => {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        renderLeads(data);
+      }).catch(() => {
+        localStorage.removeItem('pancrocio_admin_key');
+        document.getElementById('loginScreen').style.display = 'flex';
+      });
     }
   </script>
 </body>

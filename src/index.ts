@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats } from './services/database.js';
+import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats, saveAuditTiming, getTimingStats } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
 import { runPipeline } from './services/pipeline.js';
@@ -518,6 +518,14 @@ async function main() {
     res.json({ ok: true, message: 'All audits, leads, and cache purged.' });
   });
 
+  app.get('/api/v1/admin/timings', (req, res) => {
+    const adminKey = process.env.ADMIN_KEY;
+    if (!adminKey || req.query.key !== adminKey) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    res.json(getTimingStats());
+  });
+
   app.get('/api/v1/admin/errors', (req, res) => {
     const adminKey = process.env.ADMIN_KEY;
     if (!adminKey || req.query.key !== adminKey) {
@@ -620,10 +628,13 @@ async function runAudit(
     progress.status = msg;
   };
 
+  const auditStart = Date.now();
+
   // Step 1: Scrape
   addMessage('Scraping website...');
   updateAuditStatus(auditId, 'scraping');
   saveDatabase(DB_PATH);
+  const scrapeStart = Date.now();
   let scrapingResult;
   try {
     scrapingResult = await scrapeUrl(url);
@@ -631,13 +642,15 @@ async function runAudit(
     logError(auditId, 'scraping', err as Error, url);
     throw err;
   }
-  addMessage(`Scraped: ${(Buffer.byteLength(scrapingResult.html) / 1024).toFixed(0)}KB HTML, screenshots captured`);
+  const scrapeMs = Date.now() - scrapeStart;
+  addMessage(`Scraped: ${(Buffer.byteLength(scrapingResult.html) / 1024).toFixed(0)}KB HTML, screenshots captured (${(scrapeMs / 1000).toFixed(1)}s)`);
 
   // Step 2: Analyze
   addMessage('Running CRO analysis agents...');
   updateAuditStatus(auditId, 'analyzing');
   saveDatabase(DB_PATH);
 
+  const pipelineStart = Date.now();
   let pipelineResult;
   try {
     pipelineResult = await runPipeline(scrapingResult, url, gemini, addMessage, providers);
@@ -645,6 +658,7 @@ async function runAudit(
     logError(auditId, 'pipeline', err as Error, url);
     throw err;
   }
+  const pipelineMs = Date.now() - pipelineStart;
 
   // Check if we got meaningful results (at least 2 categories beyond Performance)
   const realCategories = pipelineResult.analyses.filter(a => a.category !== 'performance').length;
@@ -657,6 +671,7 @@ async function runAudit(
   }
 
   // Step 3: Translate LLM results if target lang is not English (with 30s timeout)
+  const translationStart = Date.now();
   let { quickWins, mockups, analyses } = pipelineResult;
   if (lang !== 'en') {
     addMessage('Translating results...');
@@ -682,7 +697,10 @@ async function runAudit(
     }
   }
 
+  const translationMs = Date.now() - translationStart;
+
   // Step 4: Translate UI strings if not Spanish, then generate report
+  const reportStart = Date.now();
   addMessage('Generating report...');
   updateAuditStatus(auditId, 'generating_report');
   saveDatabase(DB_PATH);
@@ -724,9 +742,12 @@ async function runAudit(
     reportHtml,
   );
   saveFindings(auditId, url, JSON.stringify(analyses));
+  const reportMs = Date.now() - reportStart;
+  const totalMs = Date.now() - auditStart;
+  saveAuditTiming(auditId, url, { totalMs, scrapeMs, pipelineMs, translationMs, reportMs });
   saveDatabase(DB_PATH);
 
-  addMessage('Audit complete!');
+  addMessage(`Audit complete! (${(totalMs / 1000).toFixed(1)}s total)`);
   progress.status = 'completed';
 
   // Step 6: NOW send verification email (only after report is ready)
