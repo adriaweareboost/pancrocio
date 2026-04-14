@@ -154,7 +154,8 @@ async function renderLocalizedReport(
     return dbCached;
   }
 
-  // Tier 3: reconstruct typed data and translate. Older audits may lack analyses_json.
+  // Tier 3: reconstruct typed data and translate.
+  console.log(`[Report] Translating audit ${auditId} to ${normalizedLang} (tier 3: LLM translation)`);
   const input: ReportRenderInput = {
     url: audit.url as string,
     globalScore: audit.global_score as number,
@@ -468,10 +469,12 @@ async function main() {
     if (verified) {
       // Translate report on-demand if requested in a different language
       try {
+        console.log(`[Report] Serving audit ${req.params.id} in lang=${reportLang} (shouldTranslate=${shouldTranslate(reportLang)})`);
         const html = await renderLocalizedReport(audit, reportLang, geminiTranslate);
         res.setHeader('Content-Type', 'text/html');
         res.send(html);
-      } catch {
+      } catch (err) {
+        console.error(`[Report] Translation failed for lang=${reportLang}:`, (err as Error).message);
         // Fallback to original language
         res.setHeader('Content-Type', 'text/html');
         res.send(audit.report_html as string);
