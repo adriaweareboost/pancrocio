@@ -191,17 +191,25 @@ export function getRecentAuditByUrl(normalizedUrl: string, days = 7): Record<str
 
 // ─── Dashboard / admin queries ───
 
-export function getAllLeads(limit = 50, source = 'web'): Record<string, unknown>[] {
-  const result = db.exec(
-    `SELECT l.id, l.email, l.url, l.created_at, l.email_verified, l.audit_id, l.source,
-            a.status AS audit_status, a.global_score, a.normalized_url
-       FROM leads l
-       LEFT JOIN audits a ON l.audit_id = a.id
-      WHERE l.source = ?
-      ORDER BY l.created_at DESC
-      LIMIT ?`,
-    [source, limit],
-  );
+const INTERNAL_EMAILS = new Set(['avidal82@gmail.com']);
+
+export function getAllLeads(limit = 50, mode: 'web' | 'internal' = 'web'): Record<string, unknown>[] {
+  const internalList = [...INTERNAL_EMAILS].map(() => '?').join(',');
+  const query = mode === 'internal'
+    ? `SELECT l.id, l.email, l.url, l.created_at, l.email_verified, l.audit_id, l.source,
+              a.status AS audit_status, a.global_score, a.normalized_url
+         FROM leads l LEFT JOIN audits a ON l.audit_id = a.id
+        WHERE l.source = 'batch' OR LOWER(l.email) IN (${internalList})
+        ORDER BY l.created_at DESC LIMIT ?`
+    : `SELECT l.id, l.email, l.url, l.created_at, l.email_verified, l.audit_id, l.source,
+              a.status AS audit_status, a.global_score, a.normalized_url
+         FROM leads l LEFT JOIN audits a ON l.audit_id = a.id
+        WHERE l.source != 'batch' AND LOWER(l.email) NOT IN (${internalList})
+        ORDER BY l.created_at DESC LIMIT ?`;
+  const params = mode === 'internal'
+    ? [...INTERNAL_EMAILS, limit]
+    : [...INTERNAL_EMAILS, limit];
+  const result = db.exec(query, params);
   if (result.length === 0) return [];
   const columns = result[0].columns;
   return result[0].values.map((row) => {

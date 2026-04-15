@@ -562,7 +562,7 @@ async function main() {
   });
 
   app.get('/api/v1/admin/batch/audits', (_req, res) => {
-    const audits = getAllLeads(200, 'batch');
+    const audits = getAllLeads(200, 'internal');
     res.json({ audits, total: audits.length });
   });
 
