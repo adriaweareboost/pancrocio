@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { initDatabase, createLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats, deleteError, saveAuditTiming, getTimingStats, startBackupScheduler, setBackupDbPath, createBackup, listBackups, getBackupFile, exportDatabase, restoreFromBackup, findExistingLead, resetLeadVerification } from './services/database.js';
+import { initDatabase, createLead, createBatchLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats, deleteError, saveAuditTiming, getTimingStats, startBackupScheduler, setBackupDbPath, createBackup, listBackups, getBackupFile, exportDatabase, restoreFromBackup, findExistingLead, resetLeadVerification } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
 import { runPipeline } from './services/pipeline.js';
@@ -557,8 +557,13 @@ async function main() {
 
   app.get('/api/v1/admin/leads', (_req, res) => {
     const stats = getLeadStats();
-    const leads = getAllLeads(100);
+    const leads = getAllLeads(100, 'web');
     res.json({ stats, leads });
+  });
+
+  app.get('/api/v1/admin/batch/audits', (_req, res) => {
+    const audits = getAllLeads(200, 'batch');
+    res.json({ audits, total: audits.length });
   });
 
   // ─── Batch audit endpoint (admin only) ───
@@ -573,32 +578,22 @@ async function main() {
       console.log(`[Batch] Processing ${item.url} (${batchQueue.length} remaining)`);
       try {
         if (!acquireAuditSlot()) {
-          // Wait for a slot
           await new Promise(resolve => setTimeout(resolve, 10000));
-          batchQueue.unshift(item); // re-add to front
+          batchQueue.unshift(item);
           continue;
         }
-        const verifyCode = String(crypto.randomInt(100000, 999999));
         const normalized = normalizeUrl(item.url);
-        const existingLead = findExistingLead(item.email, normalized);
 
-        let leadId: string;
-        if (existingLead) {
-          leadId = existingLead.id;
-          resetLeadVerification(leadId);
-          setVerifyCode(leadId, verifyCode);
-        } else {
-          leadId = uuid();
-          createLead(leadId, item.email, item.url);
-          linkLeadToAudit(leadId, item.auditId);
-          setVerifyCode(leadId, verifyCode);
-        }
-
+        // Batch: create auto-verified lead (source='batch'), no emails
+        const leadId = uuid();
+        createBatchLead(leadId, item.email, item.url);
         createAudit(item.auditId, leadId, item.url, normalized);
+        linkLeadToAudit(leadId, item.auditId);
         saveDatabase(DB_PATH);
         auditProgress.set(item.auditId, { status: 'pending', messages: ['Batch queued'], createdAt: Date.now() });
 
-        await runAudit(item.auditId, item.url, item.email, verifyCode, gemini, item.lang, { vision: geminiVision, text: geminiText, mockups: geminiTranslate })
+        // Run audit — pass empty verifyCode (not needed for batch), skip email sending
+        await runAudit(item.auditId, item.url, item.email, '', gemini, item.lang, { vision: geminiVision, text: geminiText, mockups: geminiTranslate })
           .catch((err) => {
             console.error(`[Batch] Audit ${item.auditId} failed:`, err.message);
             logError(item.auditId, 'batch_audit', err, item.url);
@@ -934,11 +929,13 @@ async function runAudit(
   addMessage(`Audit complete! (${(totalMs / 1000).toFixed(1)}s total)`);
   progress.status = 'completed';
 
-  // Step 6: NOW send verification email (only after report is ready)
-  sendVerifyCodeEmail(email, verifyCode, lang).catch((err) => {
-    logError(auditId, 'verify_email', err as Error, url);
-  });
-  sendLeadNotification(email, url, lang, pipelineResult.globalScore, auditId).catch(() => {});
+  // Step 6: Send verification email (only for non-batch audits)
+  if (verifyCode) {
+    sendVerifyCodeEmail(email, verifyCode, lang).catch((err) => {
+      logError(auditId, 'verify_email', err as Error, url);
+    });
+    sendLeadNotification(email, url, lang, pipelineResult.globalScore, auditId).catch(() => {});
+  }
 
   // Generate PDF in background (non-blocking)
   generateReportPdf(reportHtml).then((pdfBuf) => {

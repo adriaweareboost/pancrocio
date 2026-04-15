@@ -132,6 +132,7 @@
       <div class="tab" onclick="switchTab('errors')">Errors</div>
       <div class="tab" onclick="switchTab('backups')">Backups</div>
       <div class="tab" onclick="switchTab('batch')">Batch</div>
+      <div class="tab" onclick="switchTab('audits')">Mis Auditorias</div>
     </div>
 
     <div class="container">
@@ -176,6 +177,22 @@
               <tbody id="batchBody"></tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- MIS AUDITORIAS TAB (batch audits) -->
+      <div id="tab-audits" class="tab-content">
+        <div class="stats" id="auditsStats"></div>
+        <div class="toolbar">
+          <input type="text" id="auditsSearch" placeholder="Buscar por URL..." oninput="filterAuditsTable()">
+          <button class="btn-secondary" onclick="loadBatchAudits()">Actualizar</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>URL</th><th>Score</th><th>Estado</th><th>Fecha</th><th>Informe</th></tr></thead>
+            <tbody id="auditsBody"></tbody>
+          </table>
+          <div class="empty" id="emptyAudits" style="display:none">No hay auditorias batch todavia. Usa la tab Batch para lanzar.</div>
         </div>
       </div>
 
@@ -272,6 +289,7 @@
       if (name === 'errors' && !window._errorsLoaded) loadErrors();
       if (name === 'backups' && !window._backupsLoaded) loadBackups();
       if (name === 'batch') checkBatchStatus();
+      if (name === 'audits' && !window._auditsLoaded) loadBatchAudits();
     }
 
     function login() {
@@ -494,6 +512,37 @@
     }
     function downloadLiveDb() {
       window.location.href = '/api/v1/admin/backups/download?key=' + encodeURIComponent(adminKey);
+    }
+
+    // ── MIS AUDITORIAS (batch) ──
+    function loadBatchAudits() {
+      fetchApi('batch/audits').then(data => {
+        window._auditsLoaded = true;
+        const audits = data.audits || [];
+        const completed = audits.filter(a => a.audit_status === 'completed').length;
+        document.getElementById('auditsStats').innerHTML = `
+          <div class="stat-card"><div class="number">${audits.length}</div><div class="label">Total</div></div>
+          <div class="stat-card highlight"><div class="number">${completed}</div><div class="label">Completadas</div></div>
+          <div class="stat-card"><div class="number">${audits.length - completed}</div><div class="label">Pendientes/Fallidas</div></div>`;
+        window._allAudits = audits;
+        renderAuditsTable(audits);
+      });
+    }
+    function renderAuditsTable(audits) {
+      const tbody = document.getElementById('auditsBody');
+      document.getElementById('emptyAudits').style.display = audits.length ? 'none' : 'block';
+      tbody.innerHTML = audits.map(a => {
+        const sc = a.global_score, scCls = sc>=80?'score-good':sc>=60?'score-ok':'score-bad';
+        const st = a.audit_status==='completed'?'<span class="badge-ok">OK</span>':a.audit_status==='failed'?'<span class="badge-no">Fail</span>':'<span class="badge-pending">'+(a.audit_status||'...')+'</span>';
+        const d = a.created_at ? new Date(a.created_at).toLocaleString('es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '-';
+        const rpt = a.audit_id&&a.audit_status==='completed'?'<a href="/api/v1/audit/'+a.audit_id+'/report" target="_blank" style="color:#EC5F29">Ver</a>':'-';
+        const u = (a.url||'').replace(/^https?:\/\//,'');
+        return '<tr><td class="url-cell"><a href="'+esc(a.url||'')+'" target="_blank">'+esc(u)+'</a></td><td><span class="score '+scCls+'">'+(sc!=null?sc:'-')+'</span></td><td>'+st+'</td><td class="date-cell">'+d+'</td><td>'+rpt+'</td></tr>';
+      }).join('');
+    }
+    function filterAuditsTable() {
+      const q = document.getElementById('auditsSearch').value.toLowerCase();
+      renderAuditsTable((window._allAudits||[]).filter(a => (a.url||'').toLowerCase().includes(q)));
     }
 
     // ── BATCH ──

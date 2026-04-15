@@ -56,6 +56,10 @@ export async function initDatabase(dbPath: string): Promise<Database> {
   try {
     db.run(`ALTER TABLE leads ADD COLUMN verify_code TEXT`);
   } catch { /* column already exists */ }
+  // Migrate: add source column to leads (batch vs web)
+  try {
+    db.run(`ALTER TABLE leads ADD COLUMN source TEXT NOT NULL DEFAULT 'web'`);
+  } catch { /* column already exists */ }
   // Migrate: add analyses_json column for translator support (re-rendering needs analyses)
   try {
     db.run(`ALTER TABLE audits ADD COLUMN analyses_json TEXT`);
@@ -187,15 +191,16 @@ export function getRecentAuditByUrl(normalizedUrl: string, days = 7): Record<str
 
 // ─── Dashboard / admin queries ───
 
-export function getAllLeads(limit = 50): Record<string, unknown>[] {
+export function getAllLeads(limit = 50, source = 'web'): Record<string, unknown>[] {
   const result = db.exec(
-    `SELECT l.id, l.email, l.url, l.created_at, l.email_verified, l.audit_id,
+    `SELECT l.id, l.email, l.url, l.created_at, l.email_verified, l.audit_id, l.source,
             a.status AS audit_status, a.global_score, a.normalized_url
        FROM leads l
        LEFT JOIN audits a ON l.audit_id = a.id
+      WHERE l.source = ?
       ORDER BY l.created_at DESC
       LIMIT ?`,
-    [limit],
+    [source, limit],
   );
   if (result.length === 0) return [];
   const columns = result[0].columns;
@@ -254,6 +259,14 @@ export function findExistingLead(email: string, normalizedUrl: string): { id: st
 export function createLead(id: string, email: string, url: string): void {
   db.run(
     `INSERT INTO leads (id, email, url, created_at) VALUES (?, ?, ?, ?)`,
+    [id, email, url, new Date().toISOString()]
+  );
+}
+
+/** Create a batch lead — auto-verified, source='batch', no email needed. */
+export function createBatchLead(id: string, email: string, url: string): void {
+  db.run(
+    `INSERT INTO leads (id, email, url, created_at, email_verified, source) VALUES (?, ?, ?, ?, 1, 'batch')`,
     [id, email, url, new Date().toISOString()]
   );
 }
