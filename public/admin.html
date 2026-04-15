@@ -151,7 +151,15 @@
             </select>
           </div>
           <div style="margin-bottom:16px">
-            <label style="font-size:12px;font-weight:600;color:#070F2D;display:block;margin-bottom:4px">URLs (una por linea)</label>
+            <label style="font-size:12px;font-weight:600;color:#070F2D;display:block;margin-bottom:4px">URLs (una por linea o sube un CSV)</label>
+            <div style="display:flex;gap:10px;margin-bottom:8px;">
+              <label style="padding:8px 16px;border:2px dashed #e2e4ea;border-radius:10px;font-size:12px;color:#9ca3af;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:border-color 0.2s;" onmouseover="this.style.borderColor='#EC5F29'" onmouseout="this.style.borderColor='#e2e4ea'">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Subir CSV
+                <input type="file" accept=".csv,.txt" onchange="loadCsv(this)" style="display:none">
+              </label>
+              <span id="csvInfo" style="font-size:11px;color:#9ca3af;align-self:center;"></span>
+            </div>
             <textarea id="batchUrls" rows="8" placeholder="https://example.com&#10;https://another-site.com&#10;https://third-site.com" style="width:100%;padding:12px 14px;border:1px solid #e2e4ea;border-radius:10px;font-size:13px;font-family:monospace;outline:none;resize:vertical;"></textarea>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -489,6 +497,23 @@
     }
 
     // ── BATCH ──
+    function loadCsv(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        // Extract URLs from CSV: find anything that looks like http(s)://...
+        const urls = text.match(/https?:\/\/[^\s,;"'<>]+/gi) || [];
+        const unique = [...new Set(urls)];
+        const textarea = document.getElementById('batchUrls');
+        const existing = textarea.value.trim();
+        textarea.value = (existing ? existing + '\n' : '') + unique.join('\n');
+        document.getElementById('csvInfo').textContent = unique.length + ' URLs extraidas de ' + file.name;
+      };
+      reader.readAsText(file);
+      input.value = ''; // allow re-upload same file
+    }
     function launchBatch() {
       const email = document.getElementById('batchEmail').value.trim();
       const lang = document.getElementById('batchLang').value;
