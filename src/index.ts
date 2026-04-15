@@ -561,6 +561,104 @@ async function main() {
     res.json({ stats, leads });
   });
 
+  // ─── Batch audit endpoint (admin only) ───
+  const batchQueue: Array<{ url: string; email: string; lang: string; auditId: string }> = [];
+  let batchRunning = false;
+
+  async function processBatchQueue() {
+    if (batchRunning) return;
+    batchRunning = true;
+    while (batchQueue.length > 0) {
+      const item = batchQueue.shift()!;
+      console.log(`[Batch] Processing ${item.url} (${batchQueue.length} remaining)`);
+      try {
+        if (!acquireAuditSlot()) {
+          // Wait for a slot
+          await new Promise(resolve => setTimeout(resolve, 10000));
+          batchQueue.unshift(item); // re-add to front
+          continue;
+        }
+        const verifyCode = String(crypto.randomInt(100000, 999999));
+        const normalized = normalizeUrl(item.url);
+        const existingLead = findExistingLead(item.email, normalized);
+
+        let leadId: string;
+        if (existingLead) {
+          leadId = existingLead.id;
+          resetLeadVerification(leadId);
+          setVerifyCode(leadId, verifyCode);
+        } else {
+          leadId = uuid();
+          createLead(leadId, item.email, item.url);
+          linkLeadToAudit(leadId, item.auditId);
+          setVerifyCode(leadId, verifyCode);
+        }
+
+        createAudit(item.auditId, leadId, item.url, normalized);
+        saveDatabase(DB_PATH);
+        auditProgress.set(item.auditId, { status: 'pending', messages: ['Batch queued'], createdAt: Date.now() });
+
+        await runAudit(item.auditId, item.url, item.email, verifyCode, gemini, item.lang, { vision: geminiVision, text: geminiText, mockups: geminiTranslate })
+          .catch((err) => {
+            console.error(`[Batch] Audit ${item.auditId} failed:`, err.message);
+            logError(item.auditId, 'batch_audit', err, item.url);
+            updateAuditStatus(item.auditId, 'failed');
+            saveDatabase(DB_PATH);
+          })
+          .finally(() => releaseAuditSlot());
+
+        // Small delay between audits to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      } catch (err) {
+        console.error(`[Batch] Error processing ${item.url}:`, (err as Error).message);
+      }
+    }
+    batchRunning = false;
+    console.log('[Batch] Queue empty, done.');
+  }
+
+  app.post('/api/v1/admin/batch', (req, res) => {
+    const { urls, email, lang } = req.body as { urls?: string[]; email?: string; lang?: string };
+    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+      return res.status(400).json({ error: 'urls array is required' });
+    }
+    if (!email || !isValidEmail(email)) {
+      return res.status(400).json({ error: 'Valid email is required' });
+    }
+    if (urls.length > 50) {
+      return res.status(400).json({ error: 'Maximum 50 URLs per batch' });
+    }
+
+    const auditLang = normalizeLangCode(lang || 'es');
+    const jobs: Array<{ url: string; auditId: string }> = [];
+
+    for (const rawUrl of urls) {
+      if (!isValidUrl(rawUrl)) continue;
+      const auditId = uuid();
+      batchQueue.push({ url: rawUrl, email, lang: auditLang, auditId });
+      jobs.push({ url: rawUrl, auditId });
+    }
+
+    // Start processing in background
+    processBatchQueue();
+
+    res.json({
+      ok: true,
+      queued: jobs.length,
+      skipped: urls.length - jobs.length,
+      jobs,
+      message: `${jobs.length} audits queued. They will process sequentially (~45s each).`,
+    });
+  });
+
+  app.get('/api/v1/admin/batch/status', (_req, res) => {
+    res.json({
+      queueLength: batchQueue.length,
+      running: batchRunning,
+      items: batchQueue.map(i => ({ url: i.url, auditId: i.auditId })),
+    });
+  });
+
   app.post('/api/v1/admin/purge', (_req, res) => {
     purgeAllAudits();
     saveDatabase(DB_PATH);
