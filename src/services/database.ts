@@ -220,9 +220,11 @@ export function getAllLeads(limit = 50, mode: 'web' | 'internal' = 'web'): Recor
 }
 
 export function getLeadStats(): { total: number; verified: number; completed: number } {
-  const r1 = db.exec(`SELECT COUNT(*) FROM leads`);
-  const r2 = db.exec(`SELECT COUNT(*) FROM leads WHERE email_verified = 1`);
-  const r3 = db.exec(`SELECT COUNT(*) FROM audits WHERE status = 'completed'`);
+  const internalList = [...INTERNAL_EMAILS].map(() => '?').join(',');
+  const filter = `l.source != 'batch' AND LOWER(l.email) NOT IN (${internalList})`;
+  const r1 = db.exec(`SELECT COUNT(*) FROM leads l WHERE ${filter}`, [...INTERNAL_EMAILS]);
+  const r2 = db.exec(`SELECT COUNT(*) FROM leads l WHERE ${filter} AND l.email_verified = 1`, [...INTERNAL_EMAILS]);
+  const r3 = db.exec(`SELECT COUNT(*) FROM audits a JOIN leads l ON l.audit_id = a.id WHERE ${filter} AND a.status = 'completed'`, [...INTERNAL_EMAILS]);
   return {
     total: (r1[0]?.values[0]?.[0] as number) || 0,
     verified: (r2[0]?.values[0]?.[0] as number) || 0,
