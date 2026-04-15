@@ -13,8 +13,10 @@ export async function initDatabase(dbPath: string): Promise<Database> {
   if (existsSync(dbPath)) {
     const buffer = readFileSync(dbPath);
     db = new SQL.Database(buffer);
+    console.log(`[DB] Loaded existing database from ${dbPath} (${(buffer.length / 1024).toFixed(0)}KB)`);
   } else {
     db = new SQL.Database();
+    console.log(`[DB] Created new empty database at ${dbPath} (file did not exist)`);
   }
 
   db.run(`
