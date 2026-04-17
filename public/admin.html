@@ -297,6 +297,18 @@
       <div id="tab-campaigns" class="tab-content">
         <div class="card">
           <h2>Nueva Campaña Outbound</h2>
+          <div style="margin-bottom:16px;">
+            <label style="font-size:13px;font-weight:600;color:#070F2D;display:block;margin-bottom:4px;">Preset ICP (carga filtros automáticamente)</label>
+            <select id="campPreset" onchange="loadPreset()" style="width:100%;padding:10px;border:1px solid #e2e4ea;border-radius:8px;font-size:14px;">
+              <option value="">-- Personalizado --</option>
+              <option value="es-ecommerce-mid">ES Ecommerce Mid-Market</option>
+              <option value="es-d2c-small">ES D2C Pequeñas</option>
+              <option value="latam-ecommerce">LATAM Ecommerce</option>
+              <option value="dach-fashion">DACH Fashion/Apparel</option>
+              <option value="es-saas-growth">ES SaaS en crecimiento</option>
+              <option value="es-hospitality">ES Hospitality & Travel</option>
+            </select>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
             <div>
               <label style="font-size:13px;font-weight:600;color:#070F2D;display:block;margin-bottom:4px;">Nombre campaña</label>
@@ -712,6 +724,28 @@
 
     // ─── CAMPAIGNS TAB ───
     const TOOLS_BASE = 'https://boost-sales-tools-production.up.railway.app';
+    const ICP_PRESETS = {
+      'es-ecommerce-mid': { name: 'ES Ecommerce Mid-Market', locations: 'spain', employees: '11,50 / 51,200', keywords: 'ecommerce, shopify, woocommerce, tienda online', revMin: 500000, revMax: 50000000, variant: 'A', max: 15 },
+      'es-d2c-small': { name: 'ES D2C Pequeñas', locations: 'spain', employees: '1,10 / 11,50', keywords: 'direct to consumer, d2c, marca propia, dnvb', revMin: 100000, revMax: 5000000, variant: 'B', max: 10 },
+      'latam-ecommerce': { name: 'LATAM Ecommerce', locations: 'mexico, colombia, argentina', employees: '11,50 / 51,200', keywords: 'ecommerce, tienda online, comercio electronico', revMin: 500000, revMax: 50000000, variant: 'A', max: 10 },
+      'dach-fashion': { name: 'DACH Fashion', locations: 'germany, austria, switzerland', employees: '11,50 / 51,200', keywords: 'fashion, apparel, shopify, mode', revMin: 1000000, revMax: 100000000, variant: 'C', max: 10 },
+      'es-saas-growth': { name: 'ES SaaS', locations: 'spain', employees: '11,50 / 51,200', keywords: 'saas, software as a service, plataforma', revMin: 500000, revMax: 20000000, variant: 'B', max: 10 },
+      'es-hospitality': { name: 'ES Hospitality', locations: 'spain', employees: '11,50 / 51,200 / 201,500', keywords: 'hotel, hospitality, reservas, booking directo, turismo', revMin: 1000000, revMax: 100000000, variant: 'A', max: 10 },
+    };
+
+    function loadPreset() {
+      const id = document.getElementById('campPreset').value;
+      const p = ICP_PRESETS[id];
+      if (!p) return;
+      document.getElementById('campName').value = p.name + ' ' + new Date().toISOString().slice(0,10);
+      document.getElementById('campLocations').value = p.locations;
+      document.getElementById('campEmployees').value = p.employees;
+      document.getElementById('campKeywords').value = p.keywords;
+      document.getElementById('campRevMin').value = p.revMin;
+      document.getElementById('campRevMax').value = p.revMax;
+      document.getElementById('campVariant').value = p.variant;
+      document.getElementById('campMaxLeads').value = p.max;
+    }
 
     function getCampaignPayload(dryRun) {
       const locations = document.getElementById('campLocations').value.split(',').map(s => s.trim()).filter(Boolean);
