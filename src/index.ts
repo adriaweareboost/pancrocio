@@ -582,15 +582,11 @@ async function main() {
           batchQueue.unshift(item);
           continue;
         }
-        const normalized = normalizeUrl(item.url);
-
-        // Batch: create auto-verified lead (source='batch'), no emails
-        const leadId = uuid();
-        createBatchLead(leadId, item.email, item.url);
-        createAudit(item.auditId, leadId, item.url, normalized);
-        linkLeadToAudit(leadId, item.auditId);
-        saveDatabase(DB_PATH);
-        auditProgress.set(item.auditId, { status: 'pending', messages: ['Batch queued'], createdAt: Date.now() });
+        // Audit + lead records already created in POST handler (pre-persisted).
+        // Just ensure progress map is set (may have been lost on restart).
+        if (!auditProgress.has(item.auditId)) {
+          auditProgress.set(item.auditId, { status: 'pending', messages: ['Batch resumed'], createdAt: Date.now() });
+        }
 
         // Run audit — pass empty verifyCode (not needed for batch), skip email sending
         await runAudit(item.auditId, item.url, item.email, '', gemini, item.lang, { vision: geminiVision, text: geminiText, mockups: geminiTranslate })
@@ -630,9 +626,28 @@ async function main() {
     for (const rawUrl of urls) {
       if (!isValidUrl(rawUrl)) continue;
       const auditId = uuid();
+      // Pre-create audit record in DB so GET /audit/:id finds it immediately.
+      // This prevents the race condition where Railway redeploys between POST
+      // and async processing, losing the in-memory queue.
+      try {
+        const normalized = normalizeUrl(rawUrl);
+        const leadId = uuid();
+        createBatchLead(leadId, email, rawUrl);
+        createAudit(auditId, leadId, rawUrl, normalized);
+        linkLeadToAudit(leadId, auditId);
+        auditProgress.set(auditId, { status: 'pending', messages: ['Batch queued'], createdAt: Date.now() });
+      } catch (err) {
+        console.error(`[Batch] Failed to pre-create audit for ${rawUrl}:`, (err as Error).message);
+        continue; // Skip this URL, don't add to queue
+      }
       batchQueue.push({ url: rawUrl, email, lang: auditLang, auditId });
       jobs.push({ url: rawUrl, auditId });
     }
+
+    // Persist to disk before responding (so records survive a server restart).
+    saveDatabase(DB_PATH).catch((err) => {
+      console.error('[Batch] saveDatabase failed:', (err as Error).message);
+    });
 
     // Start processing in background
     processBatchQueue();
