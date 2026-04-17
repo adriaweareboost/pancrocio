@@ -625,12 +625,21 @@ async function main() {
 
     for (const rawUrl of urls) {
       if (!isValidUrl(rawUrl)) continue;
+      const normalized = normalizeUrl(rawUrl);
+
+      // Check for recent completed audit (reuse if < 7 days old).
+      const existing = getRecentAuditByUrl(normalized);
+      if (existing) {
+        console.log(`[Batch] Reusing cached audit ${existing.id} for ${rawUrl}`);
+        jobs.push({ url: rawUrl, auditId: existing.id as string });
+        continue;
+      }
+
+      // Remove stale/incomplete audit for this URL to avoid UNIQUE conflict.
+      deleteAuditByUrl(normalized);
+
       const auditId = uuid();
-      // Pre-create audit record in DB so GET /audit/:id finds it immediately.
-      // This prevents the race condition where Railway redeploys between POST
-      // and async processing, losing the in-memory queue.
       try {
-        const normalized = normalizeUrl(rawUrl);
         const leadId = uuid();
         createBatchLead(leadId, email, rawUrl);
         createAudit(auditId, leadId, rawUrl, normalized);
@@ -638,7 +647,7 @@ async function main() {
         auditProgress.set(auditId, { status: 'pending', messages: ['Batch queued'], createdAt: Date.now() });
       } catch (err) {
         console.error(`[Batch] Failed to pre-create audit for ${rawUrl}:`, (err as Error).message);
-        continue; // Skip this URL, don't add to queue
+        continue;
       }
       batchQueue.push({ url: rawUrl, email, lang: auditLang, auditId });
       jobs.push({ url: rawUrl, auditId });
