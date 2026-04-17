@@ -133,6 +133,7 @@
       <div class="tab" onclick="switchTab('backups')">Backups</div>
       <div class="tab" onclick="switchTab('batch')">Batch</div>
       <div class="tab" onclick="switchTab('audits')">Mis Auditorias</div>
+      <div class="tab" onclick="switchTab('emails')">📧 Emails</div>
     </div>
 
     <div class="container">
@@ -256,6 +257,41 @@
         </div>
       </div>
 
+      <!-- EMAILS TAB -->
+      <div id="tab-emails" class="tab-content">
+        <div class="stats" id="emailStats"></div>
+        <div class="card">
+          <div class="toolbar">
+            <h2>Emails de campaña enviados</h2>
+            <button class="btn-secondary" onclick="window._emailsLoaded=false;loadEmails()">Refrescar</button>
+          </div>
+          <div class="table-wrap" style="box-shadow:none;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Destinatario</th>
+                  <th>Asunto</th>
+                  <th>Estado</th>
+                  <th>Campaña</th>
+                  <th>Enviado</th>
+                </tr>
+              </thead>
+              <tbody id="emailBody"></tbody>
+            </table>
+            <div class="empty" id="emptyEmails" style="display:none">No hay emails enviados todavia.</div>
+          </div>
+        </div>
+        <!-- Email Preview Viewer -->
+        <div class="card" id="emailPreviewCard" style="display:none;margin-top:16px;">
+          <div class="toolbar">
+            <h2 id="emailPreviewTitle">Vista previa del email</h2>
+            <button class="btn-secondary" onclick="document.getElementById('emailPreviewCard').style.display='none'">Cerrar</button>
+          </div>
+          <div id="emailPreviewMeta" style="padding:8px 0;font-size:13px;color:#666;border-bottom:1px solid #e2e4ea;margin-bottom:12px;"></div>
+          <iframe id="emailPreviewFrame" style="width:100%;min-height:500px;border:1px solid #e2e4ea;border-radius:8px;background:#fff;" sandbox="allow-same-origin"></iframe>
+        </div>
+      </div>
+
       <!-- ERRORS TAB -->
       <div id="tab-errors" class="tab-content">
         <div class="stats" id="errorStats"></div>
@@ -290,6 +326,7 @@
       if (name === 'backups' && !window._backupsLoaded) loadBackups();
       if (name === 'batch') checkBatchStatus();
       if (name === 'audits' && !window._auditsLoaded) loadBatchAudits();
+      if (name === 'emails' && !window._emailsLoaded) loadEmails();
     }
 
     function login() {
@@ -604,6 +641,70 @@
       const el = document.getElementById('batchStatus');
       el.style.display = 'block'; el.style.background = bg; el.style.color = color;
       el.textContent = msg;
+    }
+
+    // ─── EMAIL TAB ───
+    function loadEmails() {
+      fetchApi('emails').then(data => {
+        window._emailsLoaded = true;
+        const emails = data.emails || [];
+        const stats = data.stats || {};
+        document.getElementById('emailStats').innerHTML = `
+          <div class="stat-card"><div style="font-size:28px;font-weight:800">${stats.total || 0}</div><div style="color:#9ca3af;font-size:13px">Total enviados</div></div>
+          <div class="stat-card"><div style="font-size:28px;font-weight:800;color:#22c55e">${stats.delivered || 0}</div><div style="color:#9ca3af;font-size:13px">Entregados</div></div>
+          <div class="stat-card"><div style="font-size:28px;font-weight:800;color:#2563eb">${stats.opened || 0}</div><div style="color:#9ca3af;font-size:13px">Abiertos</div></div>
+          <div class="stat-card"><div style="font-size:28px;font-weight:800;color:#EC5F29">${stats.clicked || 0}</div><div style="color:#9ca3af;font-size:13px">Clicks</div></div>
+          <div class="stat-card"><div style="font-size:28px;font-weight:800;color:#dc2626">${stats.bounced || 0}</div><div style="color:#9ca3af;font-size:13px">Rebotados</div></div>
+          <div class="stat-card"><div style="font-size:28px;font-weight:800;color:#070F2D">${stats.openRate || 0}%</div><div style="color:#9ca3af;font-size:13px">Open Rate</div></div>
+        `;
+        const tbody = document.getElementById('emailBody');
+        if (emails.length === 0) {
+          tbody.innerHTML = '';
+          document.getElementById('emptyEmails').style.display = 'block';
+          return;
+        }
+        document.getElementById('emptyEmails').style.display = 'none';
+        tbody.innerHTML = emails.map(e => {
+          const to = Array.isArray(e.to) ? e.to.join(', ') : (e.to || '?');
+          const status = e.last_event || 'queued';
+          const badge = status === 'delivered' ? 'ok' : status === 'opened' ? 'info' : status === 'clicked' ? 'info' : status === 'bounced' ? 'no' : 'pending';
+          const campaign = (e.tags && e.tags.campaign) || '-';
+          const date = e.created_at ? new Date(e.created_at).toLocaleString('es-ES') : '-';
+          return `<tr style="cursor:pointer" onclick="previewEmail('${esc(e.id)}')">
+            <td>${esc(to)}</td>
+            <td>${esc(e.subject || '-')}</td>
+            <td><span class="badge-${badge}">${esc(status)}</span></td>
+            <td>${esc(campaign)}</td>
+            <td>${date}</td>
+          </tr>`;
+        }).join('');
+      }).catch(err => {
+        document.getElementById('emailStats').innerHTML = `<div class="stat-card" style="color:#dc2626">Error cargando emails: ${esc(err.message || String(err))}</div>`;
+      });
+    }
+
+    function previewEmail(emailId) {
+      fetchApi('emails/' + emailId).then(data => {
+        const email = data.email || data;
+        const card = document.getElementById('emailPreviewCard');
+        card.style.display = 'block';
+        document.getElementById('emailPreviewTitle').textContent = 'Vista previa: ' + (email.subject || emailId);
+        const to = Array.isArray(email.to) ? email.to.join(', ') : (email.to || '?');
+        const events = (email.events || []).map(ev => `<span class="badge-${ev.type === 'opened' ? 'info' : ev.type === 'delivered' ? 'ok' : ev.type === 'bounced' ? 'no' : 'pending'}">${esc(ev.type)} ${new Date(ev.created_at).toLocaleString('es-ES')}</span>`).join(' ');
+        document.getElementById('emailPreviewMeta').innerHTML = `
+          <strong>To:</strong> ${esc(to)}<br>
+          <strong>From:</strong> ${esc(email.from || '-')}<br>
+          <strong>Subject:</strong> ${esc(email.subject || '-')}<br>
+          <strong>Status:</strong> ${esc(email.last_event || 'unknown')}<br>
+          ${events ? '<strong>Events:</strong> ' + events : ''}
+        `;
+        const frame = document.getElementById('emailPreviewFrame');
+        const htmlContent = email.html || ('<pre style="padding:16px;font-family:monospace;white-space:pre-wrap">' + esc(email.text || 'Sin contenido') + '</pre>');
+        frame.srcdoc = htmlContent;
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }).catch(err => {
+        alert('Error cargando email: ' + (err.message || String(err)));
+      });
     }
 
     // Auto-login if key stored

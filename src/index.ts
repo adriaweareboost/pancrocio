@@ -555,6 +555,43 @@ async function main() {
     next();
   });
 
+  // ─── Email analytics (proxy to Resend API) ───
+  app.get('/api/v1/admin/emails', async (_req, res) => {
+    const resendKey = process.env.RESEND_API_KEY;
+    if (!resendKey) return res.status(503).json({ error: 'RESEND_API_KEY not configured' });
+    try {
+      const resp = await fetch('https://api.resend.com/emails', {
+        headers: { 'Authorization': `Bearer ${resendKey}` }
+      });
+      const data = await resp.json() as { data?: Array<Record<string, unknown>> };
+      const emails = (data.data || []) as Array<Record<string, unknown>>;
+      // Compute stats
+      const total = emails.length;
+      const delivered = emails.filter((e: Record<string, unknown>) => e.last_event === 'delivered').length;
+      const opened = emails.filter((e: Record<string, unknown>) => ['opened', 'clicked'].includes(e.last_event as string)).length;
+      const clicked = emails.filter((e: Record<string, unknown>) => e.last_event === 'clicked').length;
+      const bounced = emails.filter((e: Record<string, unknown>) => e.last_event === 'bounced').length;
+      const openRate = total > 0 ? Math.round((opened / total) * 100) : 0;
+      res.json({ emails, stats: { total, delivered, opened, clicked, bounced, openRate } });
+    } catch (err) {
+      res.status(502).json({ error: 'Failed to fetch from Resend', detail: (err as Error).message });
+    }
+  });
+
+  app.get('/api/v1/admin/emails/:id', async (req, res) => {
+    const resendKey = process.env.RESEND_API_KEY;
+    if (!resendKey) return res.status(503).json({ error: 'RESEND_API_KEY not configured' });
+    try {
+      const resp = await fetch(`https://api.resend.com/emails/${encodeURIComponent(req.params.id)}`, {
+        headers: { 'Authorization': `Bearer ${resendKey}` }
+      });
+      const email = await resp.json();
+      res.json({ email });
+    } catch (err) {
+      res.status(502).json({ error: 'Failed to fetch email', detail: (err as Error).message });
+    }
+  });
+
   app.get('/api/v1/admin/leads', (_req, res) => {
     const stats = getLeadStats();
     const leads = getAllLeads(100, 'web');
