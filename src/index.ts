@@ -557,7 +557,7 @@ async function main() {
 
   // ─── Email analytics (proxy to Resend API) ───
   app.get('/api/v1/admin/emails', async (_req, res) => {
-    const resendKey = process.env.RESEND_API_KEY;
+    const resendKey = process.env.RESEND_OUTBOUND_API_KEY || process.env.RESEND_API_KEY;
     if (!resendKey) return res.status(503).json({ error: 'RESEND_API_KEY not configured' });
     try {
       const resp = await fetch('https://api.resend.com/emails', {
@@ -579,7 +579,7 @@ async function main() {
   });
 
   app.get('/api/v1/admin/emails/:id', async (req, res) => {
-    const resendKey = process.env.RESEND_API_KEY;
+    const resendKey = process.env.RESEND_OUTBOUND_API_KEY || process.env.RESEND_API_KEY;
     if (!resendKey) return res.status(503).json({ error: 'RESEND_API_KEY not configured' });
     try {
       const resp = await fetch(`https://api.resend.com/emails/${encodeURIComponent(req.params.id)}`, {
