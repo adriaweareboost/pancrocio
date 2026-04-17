@@ -134,6 +134,7 @@
       <div class="tab" onclick="switchTab('batch')">Batch</div>
       <div class="tab" onclick="switchTab('audits')">Mis Auditorias</div>
       <div class="tab" onclick="switchTab('emails')">Emails</div>
+      <div class="tab" onclick="switchTab('campaigns')">Campañas</div>
     </div>
 
     <div class="container">
@@ -289,6 +290,72 @@
           </div>
           <div id="emailPreviewMeta" style="padding:8px 0;font-size:13px;color:#666;border-bottom:1px solid #e2e4ea;margin-bottom:12px;"></div>
           <iframe id="emailPreviewFrame" style="width:100%;min-height:500px;border:1px solid #e2e4ea;border-radius:8px;background:#fff;" sandbox="allow-same-origin"></iframe>
+        </div>
+      </div>
+
+      <!-- CAMPAIGNS TAB -->
+      <div id="tab-campaigns" class="tab-content">
+        <div class="card">
+          <h2>Nueva Campaña Outbound</h2>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div>
+              <label style="font-size:13px;font-weight:600;color:#070F2D;display:block;margin-bottom:4px;">Nombre campaña</label>
+              <input id="campName" type="text" placeholder="Ecommerce ES Q2 2026" style="width:100%;padding:10px;border:1px solid #e2e4ea;border-radius:8px;font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:13px;font-weight:600;color:#070F2D;display:block;margin-bottom:4px;">Variante email</label>
+              <select id="campVariant" style="width:100%;padding:10px;border:1px solid #e2e4ea;border-radius:8px;font-size:14px;">
+                <option value="A">A: Audit Hook (score + 3 findings)</option>
+                <option value="B">B: Question Lead (pregunta abierta)</option>
+                <option value="C">C: Pain Point (dolor + dato)</option>
+              </select>
+            </div>
+          </div>
+          <h3 style="font-size:15px;margin:16px 0 8px;">Filtros ICP</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+            <div>
+              <label style="font-size:12px;color:#6d6d6d;display:block;margin-bottom:4px;">Países (separar por coma)</label>
+              <input id="campLocations" type="text" placeholder="spain, mexico, argentina" style="width:100%;padding:8px;border:1px solid #e2e4ea;border-radius:8px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#6d6d6d;display:block;margin-bottom:4px;">Tamaño empresa (rangos)</label>
+              <input id="campEmployees" type="text" placeholder="11,50 / 51,200" style="width:100%;padding:8px;border:1px solid #e2e4ea;border-radius:8px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#6d6d6d;display:block;margin-bottom:4px;">Keywords</label>
+              <input id="campKeywords" type="text" placeholder="ecommerce, shopify, d2c" style="width:100%;padding:8px;border:1px solid #e2e4ea;border-radius:8px;font-size:13px;">
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+            <div>
+              <label style="font-size:12px;color:#6d6d6d;display:block;margin-bottom:4px;">Revenue min ($)</label>
+              <input id="campRevMin" type="number" placeholder="500000" style="width:100%;padding:8px;border:1px solid #e2e4ea;border-radius:8px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#6d6d6d;display:block;margin-bottom:4px;">Revenue max ($)</label>
+              <input id="campRevMax" type="number" placeholder="50000000" style="width:100%;padding:8px;border:1px solid #e2e4ea;border-radius:8px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:12px;color:#6d6d6d;display:block;margin-bottom:4px;">Max leads</label>
+              <input id="campMaxLeads" type="number" value="10" min="1" max="25" style="width:100%;padding:8px;border:1px solid #e2e4ea;border-radius:8px;font-size:13px;">
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;">
+            <button class="btn-secondary" onclick="previewCampaign()">Preview leads</button>
+            <button class="btn-primary" onclick="launchCampaign(true)">Dry Run</button>
+            <button class="btn-primary" style="background:linear-gradient(135deg,#dc2626,#ea580c);" onclick="if(confirm('¿Lanzar campaña real? Se enviarán emails.')) launchCampaign(false)">Lanzar Campaña</button>
+          </div>
+          <div id="campStatus" style="display:none;margin-top:12px;padding:12px;border-radius:8px;font-size:13px;"></div>
+        </div>
+        <div class="card" id="campResultsCard" style="display:none;margin-top:16px;">
+          <h2 id="campResultsTitle">Resultados</h2>
+          <div class="stats" id="campResultStats"></div>
+          <div class="table-wrap" style="box-shadow:none;">
+            <table>
+              <thead><tr><th>Empresa</th><th>Dominio</th><th>País</th><th>Empleados</th><th>Lead</th><th>Score</th><th>Email</th></tr></thead>
+              <tbody id="campResultBody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -641,6 +708,105 @@
       const el = document.getElementById('batchStatus');
       el.style.display = 'block'; el.style.background = bg; el.style.color = color;
       el.textContent = msg;
+    }
+
+    // ─── CAMPAIGNS TAB ───
+    const TOOLS_BASE = 'https://boost-sales-tools-production.up.railway.app';
+
+    function getCampaignPayload(dryRun) {
+      const locations = document.getElementById('campLocations').value.split(',').map(s => s.trim()).filter(Boolean);
+      const empRaw = document.getElementById('campEmployees').value.split('/').map(s => s.trim()).filter(Boolean);
+      const keywords = document.getElementById('campKeywords').value.split(',').map(s => s.trim()).filter(Boolean);
+      const revMin = parseInt(document.getElementById('campRevMin').value) || undefined;
+      const revMax = parseInt(document.getElementById('campRevMax').value) || undefined;
+      return {
+        name: document.getElementById('campName').value || 'Campaign ' + new Date().toISOString().slice(0,10),
+        filters: {
+          locations: locations.length ? locations : undefined,
+          employeesRanges: empRaw.length ? empRaw : undefined,
+          keywords: keywords.length ? keywords : undefined,
+          revenueMin: revMin,
+          revenueMax: revMax,
+        },
+        maxLeads: parseInt(document.getElementById('campMaxLeads').value) || 10,
+        emailVariant: document.getElementById('campVariant').value,
+        dryRun,
+      };
+    }
+
+    function showCampStatus(msg, bg, color) {
+      const el = document.getElementById('campStatus');
+      el.style.display = 'block';
+      el.style.background = bg;
+      el.style.color = color;
+      el.textContent = msg;
+    }
+
+    function previewCampaign() {
+      showCampStatus('Buscando empresas en Apollo...', '#f3f4f6', '#070F2D');
+      const payload = getCampaignPayload(true);
+      fetch('/api/v1/admin/campaigns/preview?key=' + encodeURIComponent(adminKey), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      }).then(r => r.json()).then(data => {
+        if (data.error) { showCampStatus('Error: ' + (data.detail || data.error), '#fef2f2', '#dc2626'); return; }
+        showCampStatus(`${data.totalFound} empresas encontradas, mostrando ${data.showing}`, '#dcfce7', '#16a34a');
+        renderCampaignResults(data.companies || [], true);
+      }).catch(e => showCampStatus('Error: ' + e.message, '#fef2f2', '#dc2626'));
+    }
+
+    function launchCampaign(dryRun) {
+      const mode = dryRun ? 'Dry run' : 'REAL';
+      showCampStatus(mode + ' en curso... puede tardar varios minutos', '#fff7ed', '#d97706');
+      const payload = getCampaignPayload(dryRun);
+      fetch('/api/v1/admin/campaigns/launch?key=' + encodeURIComponent(adminKey), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      }).then(r => r.json()).then(data => {
+        if (data.error) { showCampStatus('Error: ' + (data.detail || data.error), '#fef2f2', '#dc2626'); return; }
+        const sent = data.emailsSent || 0;
+        showCampStatus(`${mode} completado. ${data.processed || 0} procesados, ${sent} emails enviados.`, sent > 0 ? '#dcfce7' : '#f3f4f6', sent > 0 ? '#16a34a' : '#070F2D');
+        renderCampaignResults(data.results || [], false);
+      }).catch(e => showCampStatus('Error: ' + e.message, '#fef2f2', '#dc2626'));
+    }
+
+    function renderCampaignResults(results, isPreview) {
+      const card = document.getElementById('campResultsCard');
+      card.style.display = 'block';
+      document.getElementById('campResultsTitle').textContent = isPreview ? 'Preview de empresas' : 'Resultados de campaña';
+      const tbody = document.getElementById('campResultBody');
+      if (isPreview) {
+        document.getElementById('campResultStats').innerHTML = '';
+        tbody.innerHTML = results.map(c => `<tr>
+          <td>${esc(c.name || '?')}</td>
+          <td>${esc(c.domain || '-')}</td>
+          <td>${esc(c.country || '-')}</td>
+          <td>${c.headcount || '-'}</td>
+          <td>-</td><td>-</td><td>-</td>
+        </tr>`).join('');
+      } else {
+        const sent = results.filter(r => r.emailSent).length;
+        const created = results.filter(r => r.leadCreated).length;
+        const skipped = results.filter(r => r.skippedReason).length;
+        document.getElementById('campResultStats').innerHTML = `
+          <div class="stat-card"><div style="font-size:28px;font-weight:800">${results.length}</div><div style="color:#9ca3af;font-size:13px">Procesados</div></div>
+          <div class="stat-card"><div style="font-size:28px;font-weight:800;color:#22c55e">${created}</div><div style="color:#9ca3af;font-size:13px">Leads creados</div></div>
+          <div class="stat-card"><div style="font-size:28px;font-weight:800;color:#2563eb">${sent}</div><div style="color:#9ca3af;font-size:13px">Emails enviados</div></div>
+          <div class="stat-card"><div style="font-size:28px;font-weight:800;color:#dc2626">${skipped}</div><div style="color:#9ca3af;font-size:13px">Skipped</div></div>
+        `;
+        tbody.innerHTML = results.map(r => {
+          const c = r.company || {};
+          const leadBadge = r.leadCreated ? '<span class="badge-ok">OK</span>' : (r.skippedReason ? '<span class="badge-no">' + esc(r.skippedReason.slice(0,20)) + '</span>' : '-');
+          const emailBadge = r.emailSent ? '<span class="badge-ok">Sent</span>' : '<span class="badge-pending">No</span>';
+          return `<tr>
+            <td>${esc(c.name || '?')}</td>
+            <td>${esc(c.domain || '-')}</td>
+            <td>${esc(c.country || '-')}</td>
+            <td>${c.headcount || '-'}</td>
+            <td>${leadBadge}</td>
+            <td>${r.auditScore != null ? r.auditScore + '/100' : '-'}</td>
+            <td>${emailBadge}</td>
+          </tr>`;
+        }).join('');
+      }
     }
 
     // ─── EMAIL TAB ───

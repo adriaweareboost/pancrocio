@@ -592,6 +592,38 @@ async function main() {
     }
   });
 
+  // ─── Campaign proxy (delegates to boost-sales-tools) ───
+  const TOOLS_BASE = process.env.TOOLS_BASE_URL || 'https://boost-sales-tools-production.up.railway.app';
+  const TOOLS_KEY = process.env.TOOLS_API_KEY || '';
+
+  app.post('/api/v1/admin/campaigns/preview', async (req, res) => {
+    try {
+      const resp = await fetch(`${TOOLS_BASE}/tool/outbound/preview`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${TOOLS_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body),
+      });
+      const data = await resp.json();
+      res.status(resp.status).json(data);
+    } catch (err) {
+      res.status(502).json({ error: 'proxy_failed', detail: (err as Error).message });
+    }
+  });
+
+  app.post('/api/v1/admin/campaigns/launch', async (req, res) => {
+    try {
+      const resp = await fetch(`${TOOLS_BASE}/tool/outbound/launch`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${TOOLS_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body),
+      });
+      const data = await resp.json();
+      res.status(resp.status).json(data);
+    } catch (err) {
+      res.status(502).json({ error: 'proxy_failed', detail: (err as Error).message });
+    }
+  });
+
   app.get('/api/v1/admin/leads', (_req, res) => {
     const stats = getLeadStats();
     const leads = getAllLeads(100, 'web');
