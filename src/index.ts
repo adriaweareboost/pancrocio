@@ -582,16 +582,7 @@ async function main() {
           batchQueue.unshift(item);
           continue;
         }
-        const normalized = normalizeUrl(item.url);
-
-        // Batch: create auto-verified lead (source='batch'), no emails
-        const leadId = uuid();
-        createBatchLead(leadId, item.email, item.url);
-        createAudit(item.auditId, leadId, item.url, normalized);
-        linkLeadToAudit(leadId, item.auditId);
-        saveDatabase(DB_PATH);
-        auditProgress.set(item.auditId, { status: 'pending', messages: ['Batch queued'], createdAt: Date.now() });
-
+        // Audit + lead records already created in POST handler.
         // Run audit — pass empty verifyCode (not needed for batch), skip email sending
         await runAudit(item.auditId, item.url, item.email, '', gemini, item.lang, { vision: geminiVision, text: geminiText, mockups: geminiTranslate })
           .catch((err) => {
@@ -630,9 +621,17 @@ async function main() {
     for (const rawUrl of urls) {
       if (!isValidUrl(rawUrl)) continue;
       const auditId = uuid();
+      // Create audit record IMMEDIATELY so polling finds it right away.
+      const normalized = normalizeUrl(rawUrl);
+      const leadId = uuid();
+      createBatchLead(leadId, email, rawUrl);
+      createAudit(auditId, leadId, rawUrl, normalized);
+      linkLeadToAudit(leadId, auditId);
+      auditProgress.set(auditId, { status: 'pending', messages: ['Batch queued'], createdAt: Date.now() });
       batchQueue.push({ url: rawUrl, email, lang: auditLang, auditId });
       jobs.push({ url: rawUrl, auditId });
     }
+    saveDatabase(DB_PATH);
 
     // Start processing in background
     processBatchQueue();
