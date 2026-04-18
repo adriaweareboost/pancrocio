@@ -143,6 +143,43 @@ export async function initDatabase(dbPath: string): Promise<Database> {
     )
   `);
 
+  // Email sequences — 7-touch cadence engine.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS email_sequences (
+      id TEXT PRIMARY KEY,
+      lead_email TEXT NOT NULL,
+      lead_name TEXT,
+      domain TEXT,
+      country TEXT NOT NULL DEFAULT 'ES',
+      campaign_name TEXT,
+      audit_id TEXT,
+      audit_score INTEGER,
+      report_url TEXT,
+      current_step INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      replied_at TEXT,
+      archived_at TEXT
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sequence_steps (
+      id TEXT PRIMARY KEY,
+      sequence_id TEXT NOT NULL,
+      step_number INTEGER NOT NULL,
+      scheduled_date TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'scheduled',
+      draft_id TEXT,
+      sent_email_id TEXT,
+      sent_at TEXT,
+      opened_at TEXT,
+      replied_at TEXT,
+      FOREIGN KEY (sequence_id) REFERENCES email_sequences(id) ON DELETE CASCADE
+    )
+  `);
+
   // Email drafts pipeline — prepared emails awaiting review before sending.
   db.run(`
     CREATE TABLE IF NOT EXISTS email_drafts (
@@ -895,6 +932,110 @@ export function startBackupScheduler(): void {
   }, 24 * 60 * 60 * 1000);
 
   console.log(`[Backup] Scheduler started — daily backups, ${BACKUP_RETENTION_DAYS} days retention`);
+}
+
+// ─── Email Sequences Engine ───
+
+export function createSequence(seq: {
+  id: string; leadEmail: string; leadName?: string; domain?: string;
+  country: string; campaignName?: string; auditId?: string;
+  auditScore?: number; reportUrl?: string;
+}): void {
+  const now = new Date().toISOString();
+  db.run(
+    `INSERT INTO email_sequences (id, lead_email, lead_name, domain, country, campaign_name, audit_id, audit_score, report_url, current_step, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'active', ?, ?)`,
+    [seq.id, seq.leadEmail, seq.leadName ?? null, seq.domain ?? null,
+     seq.country, seq.campaignName ?? null, seq.auditId ?? null,
+     seq.auditScore ?? null, seq.reportUrl ?? null, now, now]
+  );
+}
+
+export function createSequenceStep(step: {
+  id: string; sequenceId: string; stepNumber: number;
+  scheduledDate: string; draftId?: string;
+}): void {
+  db.run(
+    `INSERT INTO sequence_steps (id, sequence_id, step_number, scheduled_date, status, draft_id)
+     VALUES (?, ?, ?, ?, 'scheduled', ?)`,
+    [step.id, step.sequenceId, step.stepNumber, step.scheduledDate, step.draftId ?? null]
+  );
+}
+
+export function listSequences(status?: string): Array<Record<string, unknown>> {
+  const where = status ? `WHERE status = ?` : '';
+  const params = status ? [status] : [];
+  const result = db.exec(`SELECT * FROM email_sequences ${where} ORDER BY created_at DESC LIMIT 200`, params);
+  if (result.length === 0) return [];
+  return result[0].values.map((row: unknown[]) => {
+    const obj: Record<string, unknown> = {};
+    result[0].columns.forEach((col: string, i: number) => { obj[col] = row[i]; });
+    return obj;
+  });
+}
+
+export function getSequenceWithSteps(id: string): { sequence: Record<string, unknown> | null; steps: Array<Record<string, unknown>> } {
+  const seqResult = db.exec(`SELECT * FROM email_sequences WHERE id = ?`, [id]);
+  if (seqResult.length === 0 || seqResult[0].values.length === 0) return { sequence: null, steps: [] };
+  const seq: Record<string, unknown> = {};
+  seqResult[0].columns.forEach((col: string, i: number) => { seq[col] = seqResult[0].values[0][i]; });
+
+  const stepsResult = db.exec(`SELECT * FROM sequence_steps WHERE sequence_id = ? ORDER BY step_number`, [id]);
+  const steps = stepsResult.length > 0 ? stepsResult[0].values.map((row: unknown[]) => {
+    const obj: Record<string, unknown> = {};
+    stepsResult[0].columns.forEach((col: string, i: number) => { obj[col] = row[i]; });
+    return obj;
+  }) : [];
+
+  return { sequence: seq, steps };
+}
+
+export function getDueSteps(dateStr: string): Array<Record<string, unknown>> {
+  const result = db.exec(
+    `SELECT ss.*, es.lead_email, es.lead_name, es.domain, es.country, es.audit_score, es.report_url, es.campaign_name
+     FROM sequence_steps ss
+     JOIN email_sequences es ON ss.sequence_id = es.id
+     WHERE ss.status = 'scheduled' AND ss.scheduled_date <= ? AND es.status = 'active'
+     ORDER BY ss.scheduled_date`,
+    [dateStr]
+  );
+  if (result.length === 0) return [];
+  return result[0].values.map((row: unknown[]) => {
+    const obj: Record<string, unknown> = {};
+    result[0].columns.forEach((col: string, i: number) => { obj[col] = row[i]; });
+    return obj;
+  });
+}
+
+export function updateStepStatus(id: string, status: string, sentEmailId?: string): void {
+  if (sentEmailId) {
+    db.run(`UPDATE sequence_steps SET status = ?, sent_email_id = ?, sent_at = ? WHERE id = ?`,
+      [status, sentEmailId, new Date().toISOString(), id]);
+  } else {
+    db.run(`UPDATE sequence_steps SET status = ? WHERE id = ?`, [status, id]);
+  }
+}
+
+export function markSequenceReplied(sequenceId: string): void {
+  db.run(`UPDATE email_sequences SET status = 'replied', replied_at = ?, updated_at = ? WHERE id = ?`,
+    [new Date().toISOString(), new Date().toISOString(), sequenceId]);
+  // Cancel remaining scheduled steps.
+  db.run(`UPDATE sequence_steps SET status = 'cancelled' WHERE sequence_id = ? AND status = 'scheduled'`,
+    [sequenceId]);
+}
+
+export function archiveSequence(sequenceId: string): void {
+  db.run(`UPDATE email_sequences SET status = 'archived', archived_at = ?, updated_at = ? WHERE id = ?`,
+    [new Date().toISOString(), new Date().toISOString(), sequenceId]);
+}
+
+export function getSequenceStats(): Record<string, number> {
+  const result = db.exec(`SELECT status, COUNT(*) as c FROM email_sequences GROUP BY status`);
+  const stats: Record<string, number> = { active: 0, replied: 0, archived: 0, completed: 0 };
+  if (result.length > 0) {
+    result[0].values.forEach((row: unknown[]) => { stats[row[0] as string] = row[1] as number; });
+  }
+  return stats;
 }
 
 // ─── Email Drafts Pipeline ───
