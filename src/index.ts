@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { initDatabase, createLead, createBatchLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats, deleteError, saveAuditTiming, getTimingStats, startBackupScheduler, setBackupDbPath, createBackup, listBackups, getBackupFile, exportDatabase, restoreFromBackup, findExistingLead, resetLeadVerification, createEmailDraft, listEmailDrafts, getEmailDraft, updateEmailDraftStatus, deleteEmailDraft, getEmailDraftStats } from './services/database.js';
+import { initDatabase, createLead, createBatchLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats, deleteError, saveAuditTiming, getTimingStats, startBackupScheduler, setBackupDbPath, createBackup, listBackups, getBackupFile, exportDatabase, restoreFromBackup, findExistingLead, resetLeadVerification, createEmailDraft, listEmailDrafts, getEmailDraft, updateEmailDraftStatus, deleteEmailDraft, getEmailDraftStats, createSequence, createSequenceStep, listSequences, getSequenceWithSteps, getDueSteps, updateStepStatus, markSequenceReplied, archiveSequence, getSequenceStats } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
 import { runPipeline } from './services/pipeline.js';
@@ -687,6 +687,57 @@ async function main() {
     } catch (err) {
       res.status(502).json({ error: 'proxy_failed', detail: (err as Error).message });
     }
+  });
+
+  // ─── Sequences Engine ───
+  app.get('/api/v1/admin/sequences', (_req, res) => {
+    const status = typeof _req.query.status === 'string' ? _req.query.status : undefined;
+    const sequences = listSequences(status);
+    const stats = getSequenceStats();
+    res.json({ sequences, stats });
+  });
+
+  app.get('/api/v1/admin/sequences/:id', (req, res) => {
+    const data = getSequenceWithSteps(req.params.id);
+    if (!data.sequence) return res.status(404).json({ error: 'Sequence not found' });
+    res.json(data);
+  });
+
+  app.post('/api/v1/admin/sequences', (req, res) => {
+    const { id, leadEmail, leadName, domain, country, campaignName, auditId, auditScore, reportUrl } = req.body;
+    if (!id || !leadEmail) return res.status(400).json({ error: 'id and leadEmail required' });
+    createSequence({ id, leadEmail, leadName, domain, country: country || 'ES', campaignName, auditId, auditScore, reportUrl });
+    saveDatabase(DB_PATH).catch(() => {});
+    res.status(201).json({ ok: true, id });
+  });
+
+  app.post('/api/v1/admin/sequence-steps', (req, res) => {
+    const { id, sequenceId, stepNumber, scheduledDate, draftId } = req.body;
+    if (!id || !sequenceId || stepNumber === undefined || !scheduledDate) {
+      return res.status(400).json({ error: 'id, sequenceId, stepNumber, scheduledDate required' });
+    }
+    createSequenceStep({ id, sequenceId, stepNumber, scheduledDate, draftId });
+    saveDatabase(DB_PATH).catch(() => {});
+    res.status(201).json({ ok: true, id });
+  });
+
+  app.get('/api/v1/admin/sequence-steps/due', (req, res) => {
+    const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().slice(0, 10);
+    const steps = getDueSteps(date);
+    res.json({ steps, date });
+  });
+
+  app.post('/api/v1/admin/sequence-steps/:id/sent', (req, res) => {
+    const { emailId } = req.body as { emailId?: string };
+    updateStepStatus(req.params.id, 'sent', emailId);
+    saveDatabase(DB_PATH).catch(() => {});
+    res.json({ ok: true });
+  });
+
+  app.post('/api/v1/admin/sequences/:id/replied', (_req, res) => {
+    markSequenceReplied(_req.params.id);
+    saveDatabase(DB_PATH).catch(() => {});
+    res.json({ ok: true });
   });
 
   // ─── Email Drafts Pipeline ───
