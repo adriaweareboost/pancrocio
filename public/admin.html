@@ -261,11 +261,36 @@
       <!-- EMAILS TAB -->
       <div id="tab-emails" class="tab-content">
         <div class="stats" id="emailStats"></div>
-        <div class="card">
+        <!-- Draft Pipeline -->
+        <div class="card" id="draftPipelineCard">
           <div class="toolbar">
-            <h2>Emails de campaña enviados</h2>
-            <button class="btn-secondary" onclick="window._emailsLoaded=false;loadEmails()">Refrescar</button>
+            <h2>Pipeline de emails</h2>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-secondary" onclick="window._emailsLoaded=false;loadEmails()">Refrescar</button>
+              <button class="btn-primary" onclick="if(confirm('Enviar todos los emails en estado pendiente?')) sendAllPending()">Enviar pendientes</button>
+            </div>
           </div>
+          <div class="table-wrap" style="box-shadow:none;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Estado</th>
+                  <th>Destinatario</th>
+                  <th>Asunto</th>
+                  <th>Score</th>
+                  <th>Campaña</th>
+                  <th>Creado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="draftBody"></tbody>
+            </table>
+            <div class="empty" id="emptyDrafts" style="display:none">No hay emails en pipeline.</div>
+          </div>
+        </div>
+        <!-- Sent Emails (Resend) -->
+        <div class="card" style="margin-top:16px;">
+          <h2>Emails enviados (Resend)</h2>
           <div class="table-wrap" style="box-shadow:none;">
             <table>
               <thead>
@@ -352,10 +377,17 @@
               <input id="campMaxLeads" type="number" value="10" min="1" max="25" style="width:100%;padding:8px;border:1px solid #e2e4ea;border-radius:8px;font-size:13px;">
             </div>
           </div>
-          <div style="display:flex;gap:12px;">
-            <button class="btn-secondary" onclick="previewCampaign()">Preview leads</button>
-            <button class="btn-primary" onclick="launchCampaign(true)">Dry Run</button>
-            <button class="btn-primary" style="background:linear-gradient(135deg,#dc2626,#ea580c);" onclick="if(confirm('¿Lanzar campaña real? Se enviarán emails.')) launchCampaign(false)">Lanzar Campaña</button>
+          <h3 style="font-size:15px;margin:16px 0 8px;">Importar contactos (Apollo CSV export)</h3>
+          <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">
+            <input id="campCsvFile" type="file" accept=".csv" style="font-size:13px;">
+            <button class="btn-secondary" onclick="parseCsvContacts()">Cargar CSV</button>
+            <span id="campCsvStatus" style="font-size:12px;color:#6d6d6d;"></span>
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <button class="btn-secondary" onclick="previewCampaign()">Preview Apollo</button>
+            <button class="btn-primary" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);" onclick="loadInClickup()">2. Cargar en ClickUp</button>
+            <button class="btn-primary" style="background:linear-gradient(135deg,#d97706,#b45309);" onclick="loadBatch()">3. Cargar batch</button>
+            <button class="btn-primary" style="background:linear-gradient(135deg,#22c55e,#16a34a);" onclick="prepareEmails()">4. Preparar emails</button>
           </div>
           <div id="campStatus" style="display:none;margin-top:12px;padding:12px;border-radius:8px;font-size:13px;"></div>
         </div>
@@ -747,6 +779,90 @@
       document.getElementById('campMaxLeads').value = p.max;
     }
 
+    let campContacts = []; // Parsed from CSV or Apollo
+
+    function parseCsvContacts() {
+      const fileInput = document.getElementById('campCsvFile');
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) { alert('Selecciona un archivo CSV'); return; }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split('\n').filter(l => l.trim());
+        if (lines.length < 2) { alert('CSV vacío'); return; }
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+        const contacts = [];
+        for (let i = 1; i < lines.length; i++) {
+          const vals = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+          const row = {};
+          headers.forEach((h, j) => { row[h] = vals[j] || ''; });
+          // Map common Apollo CSV headers
+          const contact = {
+            name: row['first name'] || row['name'] || row['first_name'] || '',
+            lastName: row['last name'] || row['last_name'] || '',
+            email: row['email'] || row['email address'] || '',
+            title: row['title'] || row['job title'] || '',
+            company: row['company'] || row['company name'] || row['organization name'] || '',
+            domain: row['website'] || row['company domain'] || row['domain'] || '',
+            phone: row['phone'] || row['phone number'] || row['mobile phone'] || '',
+            linkedin: row['linkedin'] || row['linkedin url'] || row['person linkedin url'] || '',
+            country: row['country'] || row['company country'] || '',
+          };
+          if (contact.email || contact.domain) contacts.push(contact);
+        }
+        campContacts = contacts;
+        document.getElementById('campCsvStatus').textContent = contacts.length + ' contactos cargados';
+        renderCampaignResults(contacts.map(c => ({
+          name: (c.name + ' ' + c.lastName).trim() || c.company,
+          domain: c.domain,
+          country: c.country,
+          headcount: null,
+        })), true);
+      };
+      reader.readAsText(file);
+    }
+
+    function loadInClickup() {
+      if (campContacts.length === 0) { alert('Primero carga contactos (CSV o Preview Apollo)'); return; }
+      showCampStatus('Cargando ' + campContacts.length + ' contactos en ClickUp (dedup check)...', '#fff7ed', '#d97706');
+      fetch('/api/v1/admin/campaigns/load-clickup?key=' + encodeURIComponent(adminKey), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contacts: campContacts, campaignName: document.getElementById('campName').value || 'Campaign' }),
+      }).then(r => r.json()).then(data => {
+        if (data.error) { showCampStatus('Error: ' + data.error, '#fef2f2', '#dc2626'); return; }
+        showCampStatus(`ClickUp: ${data.created || 0} creados, ${data.existing || 0} ya existían, ${data.skipped || 0} skipped`, '#dcfce7', '#16a34a');
+        if (data.results) renderCampaignResults(data.results, false);
+      }).catch(e => showCampStatus('Error: ' + e.message, '#fef2f2', '#dc2626'));
+    }
+
+    function loadBatch() {
+      if (campContacts.length === 0) { alert('Primero carga contactos'); return; }
+      const websites = campContacts.map(c => c.domain ? 'https://www.' + c.domain.replace(/^(https?:\/\/)?(www\.)?/, '') : '').filter(Boolean);
+      if (websites.length === 0) { alert('Ningún contacto tiene dominio web'); return; }
+      showCampStatus('Lanzando ' + websites.length + ' auditorías en Scan&Boost...', '#fff7ed', '#d97706');
+      fetch('/api/v1/admin/campaigns/load-batch?key=' + encodeURIComponent(adminKey), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ websites }),
+      }).then(r => r.json()).then(data => {
+        if (data.error) { showCampStatus('Error: ' + data.error, '#fef2f2', '#dc2626'); return; }
+        showCampStatus(`Batch: ${data.queued || 0} auditorías en cola, ${data.cached || 0} cacheadas`, '#dcfce7', '#16a34a');
+      }).catch(e => showCampStatus('Error: ' + e.message, '#fef2f2', '#dc2626'));
+    }
+
+    function prepareEmails() {
+      if (campContacts.length === 0) { alert('Primero carga contactos'); return; }
+      const variant = document.getElementById('campVariant').value;
+      const name = document.getElementById('campName').value || 'Campaign';
+      showCampStatus('Preparando emails personalizados (requiere auditoría)...', '#fff7ed', '#d97706');
+      fetch('/api/v1/admin/campaigns/prepare-emails?key=' + encodeURIComponent(adminKey), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contacts: campContacts, campaignName: name, variant }),
+      }).then(r => r.json()).then(data => {
+        if (data.error) { showCampStatus('Error: ' + data.error, '#fef2f2', '#dc2626'); return; }
+        showCampStatus(`Emails: ${data.drafted || 0} drafts creados, ${data.skipped || 0} sin auditoría. Ve al tab Emails para revisar.`, '#dcfce7', '#16a34a');
+      }).catch(e => showCampStatus('Error: ' + e.message, '#fef2f2', '#dc2626'));
+    }
+
     function getCampaignPayload(dryRun) {
       const locations = document.getElementById('campLocations').value.split(',').map(s => s.trim()).filter(Boolean);
       const empRaw = document.getElementById('campEmployees').value.split('/').map(s => s.trim()).filter(Boolean);
@@ -845,6 +961,43 @@
 
     // ─── EMAIL TAB ───
     function loadEmails() {
+      // Load drafts pipeline
+      fetchApi('drafts').then(data => {
+        const drafts = data.drafts || [];
+        const stats = data.stats || {};
+        const tbody = document.getElementById('draftBody');
+        if (drafts.length === 0) {
+          tbody.innerHTML = '';
+          document.getElementById('emptyDrafts').style.display = 'block';
+        } else {
+          document.getElementById('emptyDrafts').style.display = 'none';
+          tbody.innerHTML = drafts.map(d => {
+            const statusBadge = d.status === 'draft' ? 'pending' : d.status === 'pending' ? 'info' : d.status === 'sent' ? 'ok' : 'no';
+            const actions = [];
+            if (d.status === 'draft') {
+              actions.push(`<button class="btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="previewDraft('${esc(d.id)}')">Ver</button>`);
+              actions.push(`<button class="btn-primary" style="padding:4px 10px;font-size:11px;" onclick="approveDraft('${esc(d.id)}')">Aprobar</button>`);
+              actions.push(`<button class="btn-danger" style="padding:4px 10px;font-size:11px;" onclick="rejectDraft('${esc(d.id)}')">Rechazar</button>`);
+            } else if (d.status === 'pending') {
+              actions.push(`<button class="btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="previewDraft('${esc(d.id)}')">Ver</button>`);
+              actions.push(`<button class="btn-primary" style="padding:4px 10px;font-size:11px;background:linear-gradient(135deg,#22c55e,#16a34a);" onclick="sendDraft('${esc(d.id)}')">Enviar</button>`);
+            } else if (d.status === 'sent') {
+              actions.push(`<button class="btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="previewDraft('${esc(d.id)}')">Ver</button>`);
+            }
+            return `<tr>
+              <td><span class="badge-${statusBadge}">${esc(d.status)}</span></td>
+              <td>${esc(d.to_email || '?')}</td>
+              <td>${esc((d.subject || '').slice(0,40))}</td>
+              <td>${d.audit_score != null ? d.audit_score + '/100' : '-'}</td>
+              <td>${esc(d.campaign_name || '-')}</td>
+              <td>${d.created_at ? new Date(d.created_at).toLocaleString('es-ES') : '-'}</td>
+              <td style="display:flex;gap:4px;">${actions.join('')}</td>
+            </tr>`;
+          }).join('');
+        }
+      }).catch(() => {});
+
+      // Load sent emails from Resend
       fetchApi('emails').then(data => {
         window._emailsLoaded = true;
         const emails = data.emails || [];
@@ -880,6 +1033,44 @@
         }).join('');
       }).catch(err => {
         document.getElementById('emailStats').innerHTML = `<div class="stat-card" style="color:#dc2626">Error cargando emails: ${esc(err.message || String(err))}</div>`;
+      });
+    }
+
+    function approveDraft(id) {
+      fetchApi('drafts/' + id + '/approve', { method: 'POST' }).then(() => { loadEmails(); });
+    }
+    function rejectDraft(id) {
+      if (!confirm('¿Rechazar este email? No se enviará.')) return;
+      fetchApi('drafts/' + id + '/reject', { method: 'POST' }).then(() => { loadEmails(); });
+    }
+    function sendDraft(id) {
+      if (!confirm('¿Enviar este email ahora?')) return;
+      fetchApi('drafts/' + id + '/send', { method: 'POST' }).then(data => {
+        if (data.ok) alert('Enviado: ' + (data.emailId || ''));
+        else alert('Error: ' + JSON.stringify(data));
+        loadEmails();
+      });
+    }
+    function sendAllPending() {
+      fetchApi('drafts/send-all-pending', { method: 'POST' }).then(data => {
+        alert(`Enviados: ${data.sent}, Fallidos: ${data.failed}`);
+        loadEmails();
+      });
+    }
+    function previewDraft(id) {
+      fetchApi('drafts/' + id).then(data => {
+        const d = data.draft || data;
+        const card = document.getElementById('emailPreviewCard');
+        card.style.display = 'block';
+        document.getElementById('emailPreviewTitle').textContent = 'Draft: ' + (d.subject || id);
+        document.getElementById('emailPreviewMeta').innerHTML = `
+          <strong>To:</strong> ${esc(d.to_email || '?')} (${esc(d.to_name || '')})<br>
+          <strong>Subject:</strong> ${esc(d.subject || '-')}<br>
+          <strong>Status:</strong> <span class="badge-${d.status === 'draft' ? 'pending' : d.status === 'sent' ? 'ok' : 'info'}">${esc(d.status || '?')}</span><br>
+          <strong>Campaign:</strong> ${esc(d.campaign_name || '-')} | <strong>Score:</strong> ${d.audit_score != null ? d.audit_score + '/100' : '-'}
+        `;
+        document.getElementById('emailPreviewFrame').srcdoc = d.html || '<p>Sin contenido HTML</p>';
+        card.scrollIntoView({ behavior: 'smooth' });
       });
     }
 

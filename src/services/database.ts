@@ -143,6 +143,28 @@ export async function initDatabase(dbPath: string): Promise<Database> {
     )
   `);
 
+  // Email drafts pipeline — prepared emails awaiting review before sending.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS email_drafts (
+      id TEXT PRIMARY KEY,
+      campaign_name TEXT NOT NULL,
+      to_email TEXT NOT NULL,
+      to_name TEXT,
+      subject TEXT NOT NULL,
+      html TEXT NOT NULL,
+      text_fallback TEXT,
+      lead_task_id TEXT,
+      audit_id TEXT,
+      audit_score INTEGER,
+      variant TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      sent_email_id TEXT,
+      created_at TEXT NOT NULL,
+      sent_at TEXT,
+      reviewed_at TEXT
+    )
+  `);
+
   saveDatabase(dbPath);
   return db;
 }
@@ -873,4 +895,64 @@ export function startBackupScheduler(): void {
   }, 24 * 60 * 60 * 1000);
 
   console.log(`[Backup] Scheduler started — daily backups, ${BACKUP_RETENTION_DAYS} days retention`);
+}
+
+// ─── Email Drafts Pipeline ───
+
+export function createEmailDraft(draft: {
+  id: string; campaignName: string; toEmail: string; toName?: string;
+  subject: string; html: string; textFallback?: string;
+  leadTaskId?: string; auditId?: string; auditScore?: number; variant?: string;
+}): void {
+  db.run(
+    `INSERT INTO email_drafts (id, campaign_name, to_email, to_name, subject, html, text_fallback, lead_task_id, audit_id, audit_score, variant, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)`,
+    [draft.id, draft.campaignName, draft.toEmail, draft.toName ?? null,
+     draft.subject, draft.html, draft.textFallback ?? null,
+     draft.leadTaskId ?? null, draft.auditId ?? null, draft.auditScore ?? null,
+     draft.variant ?? null, new Date().toISOString()]
+  );
+}
+
+export function listEmailDrafts(status?: string): Array<Record<string, unknown>> {
+  const where = status ? `WHERE status = ?` : '';
+  const params = status ? [status] : [];
+  const result = db.exec(`SELECT id, campaign_name, to_email, to_name, subject, lead_task_id, audit_score, variant, status, created_at, sent_at FROM email_drafts ${where} ORDER BY created_at DESC LIMIT 200`, params);
+  if (result.length === 0) return [];
+  return result[0].values.map((row: unknown[]) => {
+    const obj: Record<string, unknown> = {};
+    result[0].columns.forEach((col: string, i: number) => { obj[col] = row[i]; });
+    return obj;
+  });
+}
+
+export function getEmailDraft(id: string): Record<string, unknown> | null {
+  const result = db.exec(`SELECT * FROM email_drafts WHERE id = ?`, [id]);
+  if (result.length === 0 || result[0].values.length === 0) return null;
+  const obj: Record<string, unknown> = {};
+  result[0].columns.forEach((col: string, i: number) => { obj[col] = result[0].values[0][i]; });
+  return obj;
+}
+
+export function updateEmailDraftStatus(id: string, status: string, sentEmailId?: string): void {
+  if (sentEmailId) {
+    db.run(`UPDATE email_drafts SET status = ?, sent_email_id = ?, sent_at = ? WHERE id = ?`,
+      [status, sentEmailId, new Date().toISOString(), id]);
+  } else {
+    db.run(`UPDATE email_drafts SET status = ?, reviewed_at = ? WHERE id = ?`,
+      [status, new Date().toISOString(), id]);
+  }
+}
+
+export function deleteEmailDraft(id: string): void {
+  db.run(`DELETE FROM email_drafts WHERE id = ?`, [id]);
+}
+
+export function getEmailDraftStats(): Record<string, number> {
+  const result = db.exec(`SELECT status, COUNT(*) as count FROM email_drafts GROUP BY status`);
+  const stats: Record<string, number> = { draft: 0, pending: 0, sent: 0, rejected: 0 };
+  if (result.length > 0) {
+    result[0].values.forEach((row: unknown[]) => { stats[row[0] as string] = row[1] as number; });
+  }
+  return stats;
 }

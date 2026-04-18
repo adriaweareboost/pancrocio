@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
-import { initDatabase, createLead, createBatchLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats, deleteError, saveAuditTiming, getTimingStats, startBackupScheduler, setBackupDbPath, createBackup, listBackups, getBackupFile, exportDatabase, restoreFromBackup, findExistingLead, resetLeadVerification } from './services/database.js';
+import { initDatabase, createLead, createBatchLead, createAudit, updateAuditStatus, completeAudit, getAudit, saveDatabase, recoverOrphanedAudits, deleteAuditByUrl, setVerifyCode, verifyEmailCode, isEmailVerified, getLeadEmail, getStoredTranslation, storeTranslation, getStoredPdf, storePdf, countRecentAuditsByEmail, getRecentAuditByUrl, linkLeadToAudit, getAllLeads, getLeadStats, purgeAllAudits, saveFindings, getAnalytics, logError, getErrorLog, getErrorStats, deleteError, saveAuditTiming, getTimingStats, startBackupScheduler, setBackupDbPath, createBackup, listBackups, getBackupFile, exportDatabase, restoreFromBackup, findExistingLead, resetLeadVerification, createEmailDraft, listEmailDrafts, getEmailDraft, updateEmailDraftStatus, deleteEmailDraft, getEmailDraftStats } from './services/database.js';
 import { scrapeUrl, initBrowser, closeBrowser } from './services/scraper.js';
 import { createGeminiProvider } from './services/gemini.js';
 import { runPipeline } from './services/pipeline.js';
@@ -596,6 +596,71 @@ async function main() {
   const TOOLS_BASE = process.env.TOOLS_BASE_URL || 'https://boost-sales-tools-production.up.railway.app';
   const TOOLS_KEY = process.env.TOOLS_API_KEY || '';
 
+  app.post('/api/v1/admin/campaigns/load-clickup', async (req, res) => {
+    try {
+      const resp = await fetch(`${TOOLS_BASE}/tool/outbound/load-clickup`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${TOOLS_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body),
+      });
+      const data = await resp.json();
+      res.status(resp.status).json(data);
+    } catch (err) {
+      res.status(502).json({ error: 'proxy_failed', detail: (err as Error).message });
+    }
+  });
+
+  app.post('/api/v1/admin/campaigns/load-batch', async (req, res) => {
+    const { websites } = req.body as { websites?: string[] };
+    if (!websites || !Array.isArray(websites) || websites.length === 0) {
+      return res.status(400).json({ error: 'websites array required' });
+    }
+    const batchAdminKey = process.env.ADMIN_KEY;
+    try {
+      const batchResp = await fetch(`https://scanandboost.weareboost.online/api/v1/admin/batch?key=${encodeURIComponent(batchAdminKey || '')}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urls: websites, email: 'batch@weareboost.online', lang: 'es' }),
+      });
+      const data = await batchResp.json() as Record<string, unknown>;
+      const cached = (data.skipped as number) || 0;
+      res.json({ queued: data.queued, cached, jobs: data.jobs });
+    } catch (err) {
+      res.status(502).json({ error: 'batch_failed', detail: (err as Error).message });
+    }
+  });
+
+  app.post('/api/v1/admin/campaigns/prepare-emails', async (req, res) => {
+    try {
+      const resp = await fetch(`${TOOLS_BASE}/tool/outbound/prepare-emails`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${TOOLS_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body),
+      });
+      const data = await resp.json() as Record<string, unknown>;
+      // Store returned drafts in local DB.
+      const drafts = (data.drafts || []) as Array<Record<string, unknown>>;
+      for (const d of drafts) {
+        try {
+          createEmailDraft({
+            id: d.id as string,
+            campaignName: d.campaignName as string,
+            toEmail: d.toEmail as string,
+            toName: d.toName as string | undefined,
+            subject: d.subject as string,
+            html: d.html as string,
+            auditScore: d.auditScore as number | undefined,
+            variant: d.variant as string | undefined,
+          });
+        } catch { /* skip duplicate */ }
+      }
+      if (drafts.length > 0) saveDatabase(DB_PATH).catch(() => {});
+      res.status(resp.status).json(data);
+    } catch (err) {
+      res.status(502).json({ error: 'proxy_failed', detail: (err as Error).message });
+    }
+  });
+
   app.post('/api/v1/admin/campaigns/preview', async (req, res) => {
     try {
       const resp = await fetch(`${TOOLS_BASE}/tool/outbound/preview`, {
@@ -622,6 +687,111 @@ async function main() {
     } catch (err) {
       res.status(502).json({ error: 'proxy_failed', detail: (err as Error).message });
     }
+  });
+
+  // ─── Email Drafts Pipeline ───
+  app.get('/api/v1/admin/drafts', (_req, res) => {
+    const status = typeof _req.query.status === 'string' ? _req.query.status : undefined;
+    const drafts = listEmailDrafts(status);
+    const stats = getEmailDraftStats();
+    res.json({ drafts, stats });
+  });
+
+  app.get('/api/v1/admin/drafts/:id', (req, res) => {
+    const draft = getEmailDraft(req.params.id);
+    if (!draft) return res.status(404).json({ error: 'Draft not found' });
+    res.json({ draft });
+  });
+
+  app.post('/api/v1/admin/drafts', (req, res) => {
+    const { id, campaignName, toEmail, toName, subject, html, textFallback, leadTaskId, auditId, auditScore, variant } = req.body;
+    if (!id || !campaignName || !toEmail || !subject || !html) {
+      return res.status(400).json({ error: 'Missing required fields: id, campaignName, toEmail, subject, html' });
+    }
+    createEmailDraft({ id, campaignName, toEmail, toName, subject, html, textFallback, leadTaskId, auditId, auditScore, variant });
+    saveDatabase(DB_PATH).catch(() => {});
+    res.status(201).json({ ok: true, id });
+  });
+
+  app.post('/api/v1/admin/drafts/:id/approve', (_req, res) => {
+    const draft = getEmailDraft(_req.params.id);
+    if (!draft) return res.status(404).json({ error: 'Draft not found' });
+    updateEmailDraftStatus(_req.params.id, 'pending');
+    saveDatabase(DB_PATH).catch(() => {});
+    res.json({ ok: true, status: 'pending' });
+  });
+
+  app.post('/api/v1/admin/drafts/:id/send', async (req, res) => {
+    const draft = getEmailDraft(req.params.id);
+    if (!draft) return res.status(404).json({ error: 'Draft not found' });
+    if (draft.status !== 'pending' && draft.status !== 'draft') {
+      return res.status(400).json({ error: `Cannot send draft in status ${draft.status}` });
+    }
+    try {
+      const sendRes = await fetch(`${TOOLS_BASE}/tool/email/send`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${TOOLS_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: draft.to_email,
+          subject: draft.subject,
+          html: draft.html,
+          text: draft.text_fallback || undefined,
+          agentId: 'campaign-pipeline',
+          campaign: draft.campaign_name,
+        }),
+      });
+      const data = await sendRes.json() as Record<string, unknown>;
+      if (!sendRes.ok) {
+        return res.status(502).json({ error: 'Email send failed', detail: data });
+      }
+      updateEmailDraftStatus(req.params.id, 'sent', data.emailId as string);
+      saveDatabase(DB_PATH).catch(() => {});
+      res.json({ ok: true, emailId: data.emailId });
+    } catch (err) {
+      res.status(502).json({ error: 'Send failed', detail: (err as Error).message });
+    }
+  });
+
+  app.post('/api/v1/admin/drafts/:id/reject', (req, res) => {
+    const draft = getEmailDraft(req.params.id);
+    if (!draft) return res.status(404).json({ error: 'Draft not found' });
+    updateEmailDraftStatus(req.params.id, 'rejected');
+    saveDatabase(DB_PATH).catch(() => {});
+    res.json({ ok: true, status: 'rejected' });
+  });
+
+  app.delete('/api/v1/admin/drafts/:id', (req, res) => {
+    deleteEmailDraft(req.params.id);
+    saveDatabase(DB_PATH).catch(() => {});
+    res.json({ ok: true });
+  });
+
+  app.post('/api/v1/admin/drafts/send-all-pending', async (_req, res) => {
+    const pending = listEmailDrafts('pending');
+    const results: Array<{ id: string; ok: boolean; emailId?: string; error?: string }> = [];
+    for (const d of pending) {
+      try {
+        const sendRes = await fetch(`${TOOLS_BASE}/tool/email/send`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${TOOLS_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: d.to_email, subject: d.subject, html: getEmailDraft(d.id as string)?.html,
+            agentId: 'campaign-pipeline', campaign: d.campaign_name,
+          }),
+        });
+        const data = await sendRes.json() as Record<string, unknown>;
+        if (sendRes.ok) {
+          updateEmailDraftStatus(d.id as string, 'sent', data.emailId as string);
+          results.push({ id: d.id as string, ok: true, emailId: data.emailId as string });
+        } else {
+          results.push({ id: d.id as string, ok: false, error: String(data.error || 'send_failed') });
+        }
+      } catch (err) {
+        results.push({ id: d.id as string, ok: false, error: (err as Error).message });
+      }
+    }
+    saveDatabase(DB_PATH).catch(() => {});
+    res.json({ sent: results.filter(r => r.ok).length, failed: results.filter(r => !r.ok).length, results });
   });
 
   app.get('/api/v1/admin/leads', (_req, res) => {
