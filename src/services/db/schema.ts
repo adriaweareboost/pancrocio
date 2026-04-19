@@ -1,5 +1,5 @@
 import initSqlJs from 'sql.js';
-import { existsSync, readFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, mkdirSync, renameSync } from 'fs';
 import { dirname } from 'path';
 import { Database } from 'sql.js';
 import { getDb, setDb, saveDatabase } from './shared.js';
@@ -15,6 +15,18 @@ export async function initDatabase(dbPath: string): Promise<Database> {
     const buffer = readFileSync(dbPath);
     db = new SQL.Database(buffer);
     console.log(`[DB] Loaded existing database from ${dbPath} (${(buffer.length / 1024).toFixed(0)}KB)`);
+
+    // Integrity check — detect corrupted database
+    try {
+      db.run('SELECT count(*) FROM sqlite_master');
+    } catch (err) {
+      const corruptPath = `${dbPath}.corrupt-${Date.now()}`;
+      console.error(`[DB] Database is corrupted: ${(err as Error).message}`);
+      console.error(`[DB] Moving corrupt file to ${corruptPath} and creating fresh database`);
+      db.close();
+      renameSync(dbPath, corruptPath);
+      db = new SQL.Database();
+    }
   } else {
     db = new SQL.Database();
     console.log(`[DB] Created new empty database at ${dbPath} (file did not exist)`);
