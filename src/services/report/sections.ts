@@ -15,6 +15,7 @@ export function renderSidebar(ui: ReportUiStrings): string {
     <aside class="sidebar-lead" role="complementary" aria-labelledby="sidebar-title">
       <header style="text-align:center;margin-bottom:16px">
         <span aria-hidden="true">${BRAND_SVG.replace('width="80" height="72"', 'width="56" height="50"')}</span>
+        <p style="font-size:14px;font-weight:800;margin-top:6px;color:#070F2D;letter-spacing:-0.3px">Scan&amp;<span style="color:#EC5F29">Boost</span></p>
         <h2 id="sidebar-title" style="font-size:15px;color:#070F2D;font-weight:800;margin-top:8px">${escapeHtml(ui.sidebarTitle)}</h2>
         <p style="font-size:12px;color:#46495C;margin-top:4px;line-height:1.4">${escapeHtml(ui.sidebarSubtitle)}</p>
       </header>
@@ -99,7 +100,8 @@ export function renderContactCta(ui: ReportUiStrings): string {
       <div id="contactSection" class="contact-bottom" style="background:#070F2D;border-radius:20px;padding:40px 32px;margin-top:32px;box-shadow:0 4px 24px rgba(7,15,45,0.15)">
         <section aria-labelledby="cta-title">
           <header style="text-align:center;margin-bottom:24px">
-            <div aria-hidden="true" style="margin-bottom:8px">${BRAND_SVG}</div>
+            <div aria-hidden="true" style="margin-bottom:4px">${BRAND_SVG}</div>
+            <p style="font-size:18px;font-weight:800;margin-bottom:8px;color:white;letter-spacing:-0.3px">Scan&amp;<span style="color:#EC5F29">Boost</span></p>
             <h2 id="cta-title" style="font-size:24px;color:white;font-weight:800;margin-bottom:6px">${escapeHtml(ui.ctaTitle)}</h2>
             <p style="color:rgba(255,255,255,0.65);font-size:14px;max-width:420px;margin:0 auto">${escapeHtml(ui.ctaSubtitle)}</p>
           </header>
