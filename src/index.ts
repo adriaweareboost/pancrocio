@@ -1100,6 +1100,14 @@ async function main() {
     await closeBrowser();
     process.exit(0);
   });
+
+  // Prevent process crashes from uncaught errors
+  process.on('uncaughtException', (err) => {
+    console.error('[FATAL] Uncaught exception (process kept alive):', err.message);
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('[FATAL] Unhandled rejection (process kept alive):', reason);
+  });
 }
 
 async function runAudit(

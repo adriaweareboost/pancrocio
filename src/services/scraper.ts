@@ -4,22 +4,40 @@ import type { ScrapingResult, MetaTag } from '../models/interfaces.js';
 let browser: Browser | null = null;
 
 export async function initBrowser(): Promise<void> {
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--single-process',
+      '--no-zygote',
+    ],
+  });
+  browser.on('disconnected', () => {
+    console.warn('[Browser] Disconnected — will relaunch on next request');
+    browser = null;
+  });
 }
 
 export async function closeBrowser(): Promise<void> {
   if (browser) await browser.close();
+  browser = null;
 }
 
 export async function getBrowser(): Promise<Browser> {
-  if (!browser) await initBrowser();
+  if (!browser || !browser.isConnected()) {
+    browser = null;
+    await initBrowser();
+  }
   return browser!;
 }
 
 export async function scrapeUrl(url: string): Promise<ScrapingResult> {
-  if (!browser) await initBrowser();
+  const b = await getBrowser();
 
-  const context = await browser!.newContext({
+  const context = await b.newContext({
     viewport: { width: 1440, height: 900 },
     userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   });
