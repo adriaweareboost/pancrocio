@@ -1,8 +1,10 @@
 /**
- * Inline SVG brand asset for the Scan&Boost scanner icon.
+ * Inline SVG brand assets for the Scan&Boost scanner icon.
+ * BRAND_SVG: white icon for dark backgrounds (report header, CTA)
+ * BRAND_SVG_LIGHT: dark icon for light backgrounds (sidebar, mobile popup)
  */
 
-// Brand inline SVG — scanner icon (barcode scanner with corner brackets)
+// Brand inline SVG — scanner icon for dark backgrounds
 export const BRAND_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 53 48" width="80" height="72" style="vertical-align:middle">
   <path d="M18.28 46.01H10.31C7.95 46.01 6.03 44.09 6.03 41.73V33.76c0-.51-.41-.91-.91-.91s-.91.41-.91.91v7.97c0 3.37 2.74 6.11 6.11 6.11h7.97c.51 0 .91-.41.91-.91s-.41-.92-.92-.92Z" fill="white"/>
   <path d="M47.16 32.86c-.51 0-.91.41-.91.91v7.97c0 2.36-1.92 4.28-4.28 4.28h-7.96c-.51 0-.91.41-.91.91s.41.91.91.91h7.96c3.37 0 6.11-2.74 6.11-6.11v-7.97c0-.49-.41-.9-.92-.9Z" fill="white"/>
@@ -33,3 +35,8 @@ export const BRAND_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5
   <path d="M30.29 22.61c.52 0 .94.42.94.94v5.87c0 .26-.11.5-.28.67s-.41.28-.68.28c-.52-.01-.93-.44-.93-.96v-5.85c.01-.53.43-.95.95-.95Z" fill="#EB6029"/>
   <path d="M51.37 21.79H.91c-.5 0-.91.41-.91.92s.41.91.91.91h50.46c.51 0 .91-.41.91-.91s-.4-.92-.91-.92Z" fill="white"/>
 </svg>`;
+
+// Brand inline SVG — scanner icon for light backgrounds (sidebar, mobile popup)
+export const BRAND_SVG_LIGHT = BRAND_SVG
+  .replace(/fill="white"/g, 'fill="#16162B"')
+  .replace(/fill="#4D4E5C"/g, 'fill="#83848E"');
