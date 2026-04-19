@@ -17,6 +17,7 @@ let adminKey = localStorage.getItem('scanboost_admin_key') || '';
       if (name === 'batch') checkBatchStatus();
       if (name === 'audits' && !window._auditsLoaded) loadBatchAudits();
       if (name === 'emails' && !window._emailsLoaded) loadEmails();
+      if (name === 'inbound' && !window._inboundLoaded) loadInbound();
     }
 
     function login() {
@@ -331,6 +332,103 @@ let adminKey = localStorage.getItem('scanboost_admin_key') || '';
       const el = document.getElementById('batchStatus');
       el.style.display = 'block'; el.style.background = bg; el.style.color = color;
       el.textContent = msg;
+    }
+
+    // ─── INBOUND TAB ───
+    function loadInbound() {
+      // Load inbound drafts (filtered by campaign name containing 'inbound' or variant containing 'inbound')
+      fetchApi('drafts').then(data => {
+        window._inboundLoaded = true;
+        const allDrafts = data.drafts || [];
+        // Filter: inbound drafts have variant starting with 'step' + 'inbound' in variant or campaign
+        const inbound = allDrafts.filter(d =>
+          (d.variant && d.variant.includes('inbound')) ||
+          (d.campaign_name && d.campaign_name.toLowerCase().includes('inbound'))
+        );
+        const stats = { draft: 0, pending: 0, sent: 0, rejected: 0 };
+        inbound.forEach(d => { stats[d.status] = (stats[d.status] || 0) + 1; });
+
+        document.getElementById('inboundStats').innerHTML = `
+          <div class="stat-card"><div style="font-size:28px;font-weight:800">${inbound.length}</div><div style="color:#9ca3af;font-size:13px">Total inbound</div></div>
+          <div class="stat-card"><div style="font-size:28px;font-weight:800;color:#d97706">${stats.draft}</div><div style="color:#9ca3af;font-size:13px">Borrador</div></div>
+          <div class="stat-card"><div style="font-size:28px;font-weight:800;color:#2563eb">${stats.pending}</div><div style="color:#9ca3af;font-size:13px">Pendiente</div></div>
+          <div class="stat-card"><div style="font-size:28px;font-weight:800;color:#22c55e">${stats.sent}</div><div style="color:#9ca3af;font-size:13px">Enviado</div></div>
+          <div class="stat-card"><div style="font-size:28px;font-weight:800;color:#dc2626">${stats.rejected}</div><div style="color:#9ca3af;font-size:13px">Rechazado</div></div>
+        `;
+
+        const tbody = document.getElementById('inboundBody');
+        if (inbound.length === 0) {
+          tbody.innerHTML = '';
+          document.getElementById('emptyInbound').style.display = 'block';
+          return;
+        }
+        document.getElementById('emptyInbound').style.display = 'none';
+        tbody.innerHTML = inbound.map(d => {
+          const statusBadge = d.status === 'draft' ? 'pending' : d.status === 'pending' ? 'info' : d.status === 'sent' ? 'ok' : 'no';
+          const stepMatch = (d.variant || '').match(/step(\d)/);
+          const stepNum = stepMatch ? stepMatch[1] : '-';
+          const actions = [];
+          if (d.status === 'draft') {
+            actions.push(`<button class="btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="previewInbound('${esc(d.id)}')">Ver</button>`);
+            actions.push(`<button class="btn-primary" style="padding:4px 10px;font-size:11px;" onclick="approveInbound('${esc(d.id)}')">Aprobar</button>`);
+            actions.push(`<button class="btn-danger" style="padding:4px 10px;font-size:11px;" onclick="rejectInbound('${esc(d.id)}')">Rechazar</button>`);
+          } else if (d.status === 'pending') {
+            actions.push(`<button class="btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="previewInbound('${esc(d.id)}')">Ver</button>`);
+            actions.push(`<button class="btn-primary" style="padding:4px 10px;font-size:11px;background:linear-gradient(135deg,#22c55e,#16a34a);" onclick="sendInbound('${esc(d.id)}')">Enviar</button>`);
+          } else {
+            actions.push(`<button class="btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="previewInbound('${esc(d.id)}')">Ver</button>`);
+          }
+          return `<tr>
+            <td><span class="badge-${statusBadge}">${esc(d.status)}</span></td>
+            <td>${esc(d.to_email || '?')}</td>
+            <td>${esc((d.subject || '').slice(0,40))}</td>
+            <td>${d.audit_score != null ? d.audit_score + '/100' : '-'}</td>
+            <td>${stepNum}</td>
+            <td>${d.created_at ? new Date(d.created_at).toLocaleString('es-ES') : '-'}</td>
+            <td style="display:flex;gap:4px;">${actions.join('')}</td>
+          </tr>`;
+        }).join('');
+      }).catch(() => {});
+    }
+
+    function approveInbound(id) {
+      fetchApi('drafts/' + id + '/approve', { method: 'POST' }).then(() => { window._inboundLoaded = false; loadInbound(); });
+    }
+    function rejectInbound(id) {
+      if (!confirm('¿Rechazar este email inbound?')) return;
+      fetchApi('drafts/' + id + '/reject', { method: 'POST' }).then(() => { window._inboundLoaded = false; loadInbound(); });
+    }
+    function sendInbound(id) {
+      if (!confirm('¿Enviar este email inbound ahora?')) return;
+      fetchApi('drafts/' + id + '/send', { method: 'POST' }).then(data => {
+        if (data.ok) alert('Enviado: ' + (data.emailId || ''));
+        else alert('Error: ' + JSON.stringify(data));
+        window._inboundLoaded = false; loadInbound();
+      });
+    }
+    function sendAllInbound() {
+      // Filter and send only inbound pending
+      fetchApi('drafts/send-all-pending', { method: 'POST' }).then(data => {
+        alert(`Enviados: ${data.sent}, Fallidos: ${data.failed}`);
+        window._inboundLoaded = false; loadInbound();
+      });
+    }
+    function previewInbound(id) {
+      fetchApi('drafts/' + id).then(data => {
+        const d = data.draft || data;
+        const card = document.getElementById('inboundPreviewCard');
+        card.style.display = 'block';
+        document.getElementById('inboundPreviewTitle').textContent = 'Inbound: ' + (d.subject || id);
+        document.getElementById('inboundPreviewMeta').innerHTML = `
+          <strong>To:</strong> ${esc(d.to_email || '?')}<br>
+          <strong>Subject:</strong> ${esc(d.subject || '-')}<br>
+          <strong>Status:</strong> <span class="badge-${d.status === 'draft' ? 'pending' : d.status === 'sent' ? 'ok' : 'info'}">${esc(d.status || '?')}</span>
+          | <strong>Score:</strong> ${d.audit_score != null ? d.audit_score + '/100' : '-'}
+          | <strong>Step:</strong> ${esc(d.variant || '-')}
+        `;
+        document.getElementById('inboundPreviewFrame').srcdoc = d.html || '<p>Sin contenido</p>';
+        card.scrollIntoView({ behavior: 'smooth' });
+      });
     }
 
     // ─── CAMPAIGNS TAB ───

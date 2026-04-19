@@ -32,7 +32,8 @@
       <div class="tab" onclick="switchTab('backups')">Backups</div>
       <div class="tab" onclick="switchTab('batch')">Batch</div>
       <div class="tab" onclick="switchTab('audits')">Mis Auditorias</div>
-      <div class="tab" onclick="switchTab('emails')">Emails</div>
+      <div class="tab" onclick="switchTab('inbound')">Inbound</div>
+      <div class="tab" onclick="switchTab('emails')">Outbound</div>
       <div class="tab" onclick="switchTab('campaigns')">Campañas</div>
     </div>
 
@@ -157,7 +158,46 @@
         </div>
       </div>
 
-      <!-- EMAILS TAB -->
+      <!-- INBOUND TAB -->
+      <div id="tab-inbound" class="tab-content">
+        <div class="stats" id="inboundStats"></div>
+        <div class="card">
+          <div class="toolbar">
+            <h2>Pipeline Inbound (Scan&Boost)</h2>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-secondary" onclick="window._inboundLoaded=false;loadInbound()">Refrescar</button>
+              <button class="btn-primary" onclick="if(confirm('Enviar todos los inbound pendientes?')) sendAllInbound()">Enviar pendientes</button>
+            </div>
+          </div>
+          <div class="table-wrap" style="box-shadow:none;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Estado</th>
+                  <th>Destinatario</th>
+                  <th>Asunto</th>
+                  <th>Score</th>
+                  <th>Step</th>
+                  <th>Creado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="inboundBody"></tbody>
+            </table>
+            <div class="empty" id="emptyInbound" style="display:none">No hay emails inbound en pipeline.</div>
+          </div>
+        </div>
+        <div class="card" id="inboundPreviewCard" style="display:none;margin-top:16px;">
+          <div class="toolbar">
+            <h2 id="inboundPreviewTitle">Vista previa</h2>
+            <button class="btn-secondary" onclick="document.getElementById('inboundPreviewCard').style.display='none'">Cerrar</button>
+          </div>
+          <div id="inboundPreviewMeta" style="padding:8px 0;font-size:13px;color:#666;border-bottom:1px solid #e2e4ea;margin-bottom:12px;"></div>
+          <iframe id="inboundPreviewFrame" style="width:100%;min-height:500px;border:1px solid #e2e4ea;border-radius:8px;background:#fff;" sandbox="allow-same-origin"></iframe>
+        </div>
+      </div>
+
+      <!-- OUTBOUND EMAILS TAB -->
       <div id="tab-emails" class="tab-content">
         <div class="stats" id="emailStats"></div>
         <!-- Draft Pipeline -->
